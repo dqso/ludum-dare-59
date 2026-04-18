@@ -12,6 +12,17 @@ type TopLeftGetter interface {
 	TopLeftY() float64
 }
 
+type SizeGetter interface {
+	Width() float64
+	Height() float64
+}
+
+type PivotGetter interface {
+	PivotX() float64
+	PivotY() float64
+	PivotRadius() float64
+}
+
 type SpeedGetter interface {
 	Speed() float64
 }
@@ -27,6 +38,7 @@ type Drawable interface {
 type Player interface {
 	Positionable
 	TopLeftGetter
+	PivotGetter
 	SpeedGetter
 	Movable
 	Drawable

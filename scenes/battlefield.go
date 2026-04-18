@@ -98,7 +98,7 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 			ctx.Text(fmt.Sprintf("Point: (%d; %d)", cx, cy))
 
 			ctx.Text(fmt.Sprintf("Camera Position: (%0.2f; %0.2f)", s.camera.X, s.camera.Y))
-			ctx.Text(fmt.Sprintf("World Position: (%0.2f; %0.2f)", s.player.X(), s.player.Y()))
+			ctx.Text(fmt.Sprintf("Player Position: (%0.2f; %0.2f)", s.player.X(), s.player.Y()))
 		})
 		return nil
 	}); err != nil {
@@ -126,6 +126,16 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 
 	s.camera.Follow(s.player, float64(winW), float64(winH))
 
+	radius := s.player.PivotRadius()
+	for _, t := range s.tokens {
+		px, py := s.player.PivotX(), s.player.PivotY()
+		cx := clamp(px, t.TopLeftX(), t.TopLeftX()+t.Width())
+		cy := clamp(py, t.TopLeftY(), t.TopLeftY()+t.Height())
+		dx := px - cx
+		dy := py - cy
+		t.SetFocus(dx*dx+dy*dy <= radius*radius)
+	}
+
 	return nil, nil
 }
 
@@ -146,3 +156,13 @@ func (s *battlefieldScene) Draw(screen *ebiten.Image) {
 }
 
 func (s *battlefieldScene) Name() string { return "Battlefield" }
+
+func clamp(v, lo, hi float64) float64 {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
+}
