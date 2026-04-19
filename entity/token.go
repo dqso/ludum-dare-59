@@ -10,6 +10,7 @@ type Token interface {
 	SetFocus(focus bool)
 	IsFocused() bool
 	Collect() CollectedToken
+	Answer() Answer
 }
 
 type CollectedToken interface {

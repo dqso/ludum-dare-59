@@ -45,6 +45,7 @@ func (t Token) TopLeftY() float64         { return t.y - t.h/2 }
 func (t *Token) SetFocus(focus bool)      { t.focused = focus }
 func (t Token) IsFocused() bool           { return t.focused }
 func (t *Token) SetPosition(x, y float64) { t.x = x; t.y = y }
+func (t Token) Answer() entity.Answer     { return t.answer }
 
 func (t *Token) Draw(screen *ebiten.Image, op *ebiten.DrawImageOptions) {
 	if t.lastFocused != t.focused {

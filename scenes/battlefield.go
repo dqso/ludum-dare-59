@@ -3,16 +3,20 @@ package scenes
 import (
 	"fmt"
 	"image"
+	"image/color"
+	"math"
 	"math/rand/v2"
 	"strconv"
 
 	"github.com/dqso/ludum-dare-59/assets"
+	"github.com/dqso/ludum-dare-59/character"
 	"github.com/dqso/ludum-dare-59/entity"
 	"github.com/dqso/ludum-dare-59/player"
 	"github.com/dqso/ludum-dare-59/token"
 	"github.com/ebitengine/debugui"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 	"golang.org/x/image/colornames"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
@@ -23,12 +27,14 @@ type battlefieldScene struct {
 	questions entity.QuestionsDatabase
 	fontFace  font.Face
 
-	player    entity.Player
-	camera    Camera
-	tokens    []entity.Token
-	inventory [9]entity.CollectedToken
+	player     entity.Player
+	camera     Camera
+	characters []entity.Character
+	tokens     []entity.Token
+	inventory  [9]entity.CollectedToken
 
-	tokensInFocus int
+	nearestCharacterIdx int
+	tokensInFocus       int
 
 	debug debugui.DebugUI
 }
@@ -81,14 +87,22 @@ func NewBattlefieldScene(game entity.Game, questions entity.QuestionsDatabase) e
 		tokens = append(tokens, token.NewToken(fontFace, a, float64(rand.IntN(800)-400), float64(rand.IntN(600)-300)))
 	}
 
+	characters := make([]entity.Character, 0)
+	c, err := character.NewCharacter(entity.CharacterRoleRecruiter, 30, 40, questions.GetRandomQuestions(3))
+	if err != nil {
+		return NewErrorScene(game, err)
+	}
+	characters = append(characters, c)
+
 	return &battlefieldScene{
 		game:      game,
 		questions: questions,
 		fontFace:  fontFace,
 
-		player: player,
-		camera: camera,
-		tokens: tokens,
+		player:     player,
+		camera:     camera,
+		characters: characters,
+		tokens:     tokens,
 	}
 }
 
@@ -98,15 +112,17 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 		ctx.Window("TODO", image.Rect(x, y, x+250, y+140), func(layout debugui.ContainerLayout) {
 			ctx.Text(fmt.Sprintf("FPS: %0.2f; TPS: %0.2f", ebiten.ActualFPS(), ebiten.ActualTPS()))
 
-			cx, cy := ebiten.CursorPosition()
-			ctx.Text(fmt.Sprintf("Point Pos: (%d; %d)", cx, cy))
-			ctx.Text(fmt.Sprintf("Player Pos: (%0.2f; %0.2f)", s.player.X(), s.player.Y()))
+			//cx, cy := ebiten.CursorPosition()
+			//ctx.Text(fmt.Sprintf("Point Pos: (%d; %d)", cx, cy))
+			//ctx.Text(fmt.Sprintf("Player Pos: (%0.2f; %0.2f)", s.player.X(), s.player.Y()))
 
-			ctx.Text("Press [Shift]+[F] for fullscreen.")
-			if s.tokensInFocus > 1 {
-				ctx.Text("You can pick up these phrases with [E].")
-			} else if s.tokensInFocus == 1 {
-				ctx.Text("You can pick up this phrase with [E].")
+			// TODO убирать про фулскрин, после полминуты игры
+			ctx.Text("Use [Shift]+[F] for fullscreen.")
+			if s.tokensInFocus > 0 {
+				ctx.Text("Use [E] to pick up phrases.")
+			}
+			if s.nearestCharacterIdx >= 0 {
+				ctx.Text("Use [1]-[9] to answer.")
 			}
 		})
 		return nil
@@ -140,8 +156,8 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 	s.camera.Follow(s.player, float64(winW), float64(winH))
 
 	s.tokensInFocus = 0
-	radius := s.player.PivotRadius()
-	nearestIdx, nearestDistance := -1, 999.0
+	playerRadius := s.player.PivotRadius()
+	nearestTokenIdx, nearestTokenDistance := -1, 99999.0
 	for idx, t := range s.tokens {
 		px, py := s.player.PivotX(), s.player.PivotY()
 		cx := clamp(px, t.TopLeftX(), t.TopLeftX()+t.Width())
@@ -149,10 +165,10 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 		dx := px - cx
 		dy := py - cy
 		distance2 := dx*dx + dy*dy
-		if distance2 <= radius*radius {
+		if distance2 <= playerRadius*playerRadius {
 			t.SetFocus(true)
-			if distance2 < nearestDistance {
-				nearestIdx, nearestDistance = idx, distance2
+			if distance2 < nearestTokenDistance {
+				nearestTokenIdx, nearestTokenDistance = idx, distance2
 			}
 			s.tokensInFocus++
 		} else {
@@ -160,14 +176,39 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 		}
 	}
 
-	if ebiten.IsKeyPressed(ebiten.KeyE) && nearestIdx >= 0 {
+	if ebiten.IsKeyPressed(ebiten.KeyE) && nearestTokenIdx >= 0 {
 		for idx := range s.inventory {
 			if s.inventory[idx] != nil {
 				continue
 			}
-			s.inventory[idx] = s.tokens[nearestIdx].Collect()
-			s.tokens = append(s.tokens[:nearestIdx], s.tokens[nearestIdx+1:]...)
+			s.inventory[idx] = s.tokens[nearestTokenIdx].Collect()
+			s.tokens = append(s.tokens[:nearestTokenIdx], s.tokens[nearestTokenIdx+1:]...)
 			break
+		}
+	}
+
+	s.nearestCharacterIdx = -1
+	nearestCharacterDistance := 99999.0
+	const contactDeltaRadius = 15.0
+	for idx, c := range s.characters {
+		px, py := s.player.PivotX(), s.player.PivotY()
+		dx := px - c.PivotX()
+		dy := py - c.PivotY()
+		distance2 := dx*dx + dy*dy
+		touchRadius := playerRadius + c.PivotRadius()
+		if distance2 < (touchRadius+contactDeltaRadius)*(touchRadius+contactDeltaRadius) {
+			c.SetFocus(true)
+			if distance2 < nearestCharacterDistance {
+				s.nearestCharacterIdx = idx
+				nearestCharacterDistance = distance2
+			}
+			if distance2 < touchRadius*touchRadius && distance2 > 0 {
+				dist := math.Sqrt(distance2)
+				push := touchRadius - dist
+				s.player.Move(dx/dist*push, dy/dist*push)
+			}
+		} else {
+			c.SetFocus(false)
 		}
 	}
 
@@ -183,7 +224,13 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 			}
 			t := s.inventory[idx].Drop(s.player.X(), s.player.Y())
 			s.inventory[idx] = nil
-			s.tokens = append(s.tokens, t)
+
+			if s.nearestCharacterIdx >= 0 {
+				answer := t.Answer()
+				s.characters[s.nearestCharacterIdx].AnswerTheQuestion(s.questions, answer)
+			} else {
+				s.tokens = append(s.tokens, t)
+			}
 			break
 		}
 	}
@@ -198,6 +245,19 @@ func (s *battlefieldScene) Draw(screen *ebiten.Image) {
 		op := &ebiten.DrawImageOptions{}
 		op.GeoM.Translate(t.TopLeftX()-s.camera.X, t.TopLeftY()-s.camera.Y)
 		t.Draw(screen, op)
+	}
+
+	for _, c := range s.characters {
+		op := &ebiten.DrawImageOptions{}
+		op.GeoM.Translate(c.TopLeftX()-s.camera.X, c.TopLeftY()-s.camera.Y)
+		c.Draw(screen, op)
+		if c.IsFocused() {
+			if q := c.GetQuestion(); q != nil {
+				tipX := c.TopLeftX() + c.Width()/2 - s.camera.X
+				tipY := c.TopLeftY() - s.camera.Y
+				drawSpeechBubble(screen, s.fontFace, q.Question(), tipX, tipY)
+			}
+		}
 	}
 
 	op := &ebiten.DrawImageOptions{}
@@ -242,6 +302,61 @@ func (s *battlefieldScene) Draw(screen *ebiten.Image) {
 
 func (s *battlefieldScene) Name() string { return "Battlefield" }
 
+func drawSpeechBubble(screen *ebiten.Image, face font.Face, txt string, tipX, tipY float64) {
+	const pad = 10.0
+	const r = 8.0
+	const arrowH = 14.0
+	const arrowHalfW = 8.0
+
+	bounds := text.BoundString(face, txt)
+	w := float64(bounds.Dx()) + pad*2
+	h := float64(bounds.Dy()) + pad*2
+
+	x := tipX - w/2
+	y := tipY - h - arrowH
+
+	fillColor := func(vs []ebiten.Vertex) {
+		for i := range vs {
+			vs[i].SrcX = 1
+			vs[i].SrcY = 1
+			vs[i].ColorR = 0.98
+			vs[i].ColorG = 0.98
+			vs[i].ColorB = 0.9
+			vs[i].ColorA = 0.95
+		}
+	}
+	opts := &ebiten.DrawTrianglesOptions{AntiAlias: true}
+
+	var body vector.Path
+	body.MoveTo(float32(x+r), float32(y))
+	body.LineTo(float32(x+w-r), float32(y))
+	body.ArcTo(float32(x+w), float32(y), float32(x+w), float32(y+r), float32(r))
+	body.LineTo(float32(x+w), float32(y+h-r))
+	body.ArcTo(float32(x+w), float32(y+h), float32(x+w-r), float32(y+h), float32(r))
+	body.LineTo(float32(x+r), float32(y+h))
+	body.ArcTo(float32(x), float32(y+h), float32(x), float32(y+h-r), float32(r))
+	body.LineTo(float32(x), float32(y+r))
+	body.ArcTo(float32(x), float32(y), float32(x+r), float32(y), float32(r))
+	body.Close()
+	vs, is := body.AppendVerticesAndIndicesForFilling(nil, nil)
+	fillColor(vs)
+	screen.DrawTriangles(vs, is, whiteImage, opts)
+
+	var arrow vector.Path
+	arrow.MoveTo(float32(tipX-arrowHalfW), float32(y+h))
+	arrow.LineTo(float32(tipX), float32(tipY))
+	arrow.LineTo(float32(tipX+arrowHalfW), float32(y+h))
+	arrow.Close()
+	vs, is = arrow.AppendVerticesAndIndicesForFilling(nil, nil)
+	fillColor(vs)
+	screen.DrawTriangles(vs, is, whiteImage, opts)
+
+	op := &ebiten.DrawImageOptions{}
+	op.ColorM.ScaleWithColor(colornames.Black)
+	op.GeoM.Translate(x+pad-float64(bounds.Min.X), y+pad-float64(bounds.Min.Y))
+	text.DrawWithOptions(screen, txt, face, op)
+}
+
 func clamp(v, lo, hi float64) float64 {
 	if v < lo {
 		return lo
@@ -250,4 +365,11 @@ func clamp(v, lo, hi float64) float64 {
 		return hi
 	}
 	return v
+}
+
+var whiteImage *ebiten.Image
+
+func init() {
+	whiteImage = ebiten.NewImage(3, 3)
+	whiteImage.Fill(color.White)
 }

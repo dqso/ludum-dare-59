@@ -9,6 +9,7 @@ import (
 type QuestionsDatabase interface {
 	GetRandomQuestions(num int) []Question
 	GetRandomAnswers(num int) []Answer
+	Match(question Question, answer Answer) (int, error)
 }
 
 type Question interface {
@@ -18,12 +19,6 @@ type Question interface {
 type Answer interface {
 	Answer() string
 	Category() AnswerCategory
-}
-
-type QuestionAnswer interface {
-	Question() Question
-	Answer() Answer
-	Points() int8
 }
 
 type AnswerCategory string

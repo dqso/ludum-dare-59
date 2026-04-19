@@ -40,8 +40,8 @@ func (a Answer) Category() entity.AnswerCategory { return a.category }
 // --------------------------------------------------
 
 type QuestionWithAnswers struct {
-	question Question
-	answers  []QuestionAnswer
+	question  Question
+	byAnswers map[string]*QuestionAnswer
 }
 
 // --------------------------------------------------
@@ -74,8 +74,8 @@ func NewQuestionsDatabase(csvData []byte) (*QuestionsDatabase, error) {
 			question: q,
 		}
 		db.byQuestion[question.question] = &QuestionWithAnswers{
-			question: question,
-			answers:  make([]QuestionAnswer, 0),
+			question:  question,
+			byAnswers: make(map[string]*QuestionAnswer),
 		}
 		db.questions = append(db.questions, question)
 	}
@@ -103,14 +103,14 @@ func NewQuestionsDatabase(csvData []byte) (*QuestionsDatabase, error) {
 			if points == 0 {
 				continue
 			}
-			qa := QuestionAnswer{
+			qa := &QuestionAnswer{
 				question: Question{
 					question: question,
 				},
 				answer: answer,
 				points: int8(points),
 			}
-			db.byQuestion[question].answers = append(db.byQuestion[question].answers, qa)
+			db.byQuestion[question].byAnswers[answer.Answer()] = qa
 		}
 		db.answers = append(db.answers, answer)
 	}
@@ -144,4 +144,16 @@ func (d *QuestionsDatabase) GetRandomAnswers(num int) []entity.Answer {
 		return list[:num]
 	}
 	return list
+}
+
+func (d *QuestionsDatabase) Match(question entity.Question, answer entity.Answer) (int, error) {
+	qa, ok := d.byQuestion[question.Question()]
+	if !ok {
+		return 0, fmt.Errorf("question not found")
+	}
+	a, ok := qa.byAnswers[answer.Answer()]
+	if !ok {
+		return 0, fmt.Errorf("answer not found")
+	}
+	return int(a.points), nil
 }
