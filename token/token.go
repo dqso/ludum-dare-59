@@ -15,21 +15,19 @@ const padding = 5
 type Token struct {
 	x, y        float64
 	w, h        float64
-	str         string
-	clr         color.Color
 	sprite      *ebiten.Image
 	lastFocused bool
 	focused     bool
 	fontFace    font.Face
+	answer      entity.Answer
 }
 
-func NewToken(fontFace font.Face, str string, x, y float64, clr color.Color) *Token {
+func NewToken(fontFace font.Face, answer entity.Answer, x, y float64) *Token {
 	t := &Token{
 		x:        x,
 		y:        y,
-		str:      str,
-		clr:      clr,
 		fontFace: fontFace,
+		answer:   answer,
 	}
 	t.rebuildSprite()
 	t.w = float64(t.sprite.Bounds().Dx())
@@ -57,9 +55,9 @@ func (t *Token) Draw(screen *ebiten.Image, op *ebiten.DrawImageOptions) {
 }
 
 func (t *Token) rebuildSprite() {
-	rect := text.BoundString(t.fontFace, t.str)
+	rect := text.BoundString(t.fontFace, t.answer.Answer())
 	sprite := ebiten.NewImage(rect.Dx()+padding*2, rect.Dy()+padding*2)
-	r32, g32, b32, a32 := t.clr.RGBA()
+	r32, g32, b32, a32 := entity.AnswerCategoryToColor(t.answer.Category()).RGBA()
 	r, g, b, a := uint8(r32>>8), uint8(g32>>8), uint8(b32>>8), uint8(a32>>8)
 	//sprite.Fill(color.RGBA{
 	//	R: r + (255-r)/2,
@@ -94,11 +92,11 @@ func (t *Token) rebuildSprite() {
 		A: 200,
 	})
 
-	vector.StrokeRect(sprite, 0, 0, float32(rect.Dx()-1)+padding*2, float32(rect.Dy()-1)+padding*2, 1, t.clr, false)
+	vector.StrokeRect(sprite, 0, 0, float32(rect.Dx()-1)+padding*2, float32(rect.Dy()-1)+padding*2, 1, entity.AnswerCategoryToColor(t.answer.Category()), false)
 	var opts ebiten.DrawImageOptions
-	opts.ColorM.ScaleWithColor(t.clr)
+	opts.ColorM.ScaleWithColor(entity.AnswerCategoryToColor(t.answer.Category()))
 	opts.GeoM.Translate(float64(-rect.Min.X)+padding, float64(-rect.Min.Y)+padding)
-	text.DrawWithOptions(sprite, t.str, t.fontFace, &opts)
+	text.DrawWithOptions(sprite, t.answer.Answer(), t.fontFace, &opts)
 	t.sprite = sprite
 }
 

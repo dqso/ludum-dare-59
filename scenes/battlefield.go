@@ -3,6 +3,7 @@ package scenes
 import (
 	"fmt"
 	"image"
+	"math/rand/v2"
 	"strconv"
 
 	"github.com/dqso/ludum-dare-59/assets"
@@ -27,7 +28,7 @@ type battlefieldScene struct {
 	tokens    []entity.Token
 	inventory [9]entity.CollectedToken
 
-	tokenInFocus bool
+	tokensInFocus int
 
 	debug debugui.DebugUI
 }
@@ -74,6 +75,12 @@ func NewBattlefieldScene(game entity.Game, questions entity.QuestionsDatabase) e
 		return NewErrorScene(game, err)
 	}
 
+	tokens := make([]entity.Token, 0)
+	//for _, a := range append(append(append(append(append(append(append(append(append(append(questions.GetRandomAnswers(300), questions.GetRandomAnswers(300)...), questions.GetRandomAnswers(300)...), questions.GetRandomAnswers(300)...), questions.GetRandomAnswers(300)...), questions.GetRandomAnswers(300)...), questions.GetRandomAnswers(300)...), questions.GetRandomAnswers(300)...), questions.GetRandomAnswers(300)...), questions.GetRandomAnswers(300)...), questions.GetRandomAnswers(300)...) {
+	for _, a := range questions.GetRandomAnswers(300) {
+		tokens = append(tokens, token.NewToken(fontFace, a, float64(rand.IntN(800)-400), float64(rand.IntN(600)-300)))
+	}
+
 	return &battlefieldScene{
 		game:      game,
 		questions: questions,
@@ -81,25 +88,14 @@ func NewBattlefieldScene(game entity.Game, questions entity.QuestionsDatabase) e
 
 		player: player,
 		camera: camera,
-		tokens: []entity.Token{
-			token.NewToken(fontFace, "Any other offers?", -10, -65, colornames.Blue),
-			token.NewToken(fontFace, "depends", -45, 115, colornames.Green),
-			token.NewToken(fontFace, "no idea", 90, 70, colornames.Violet),
-			token.NewToken(fontFace, "doesn't\nmatter", 150, -70, colornames.Navy),
-			token.NewToken(fontFace, "When can you start?", 0, 200, colornames.Lightgray),
-			token.NewToken(fontFace, "it's trendy", 0, -200, colornames.Darkgray),
-			token.NewToken(fontFace, "Привет :)", 0, -300, colornames.Greenyellow),
-			token.NewToken(fontFace, "не знаю", -100, 300, colornames.Peachpuff),
-			token.NewToken(fontFace, "никогда", 100, 300, colornames.Tan),
-			token.NewToken(fontFace, "две недели", 200, 250, colornames.Wheat),
-		},
+		tokens: tokens,
 	}
 }
 
 func (s *battlefieldScene) Update() (entity.Scene, error) {
 	if _, err := s.debug.Update(func(ctx *debugui.Context) error {
 		const x, y = 10, 80
-		ctx.Window("TODO", image.Rect(x, y, x+240, y+140), func(layout debugui.ContainerLayout) {
+		ctx.Window("TODO", image.Rect(x, y, x+250, y+140), func(layout debugui.ContainerLayout) {
 			ctx.Text(fmt.Sprintf("FPS: %0.2f; TPS: %0.2f", ebiten.ActualFPS(), ebiten.ActualTPS()))
 
 			cx, cy := ebiten.CursorPosition()
@@ -107,7 +103,9 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 			ctx.Text(fmt.Sprintf("Player Pos: (%0.2f; %0.2f)", s.player.X(), s.player.Y()))
 
 			ctx.Text("Press [Shift]+[F] for fullscreen.")
-			if s.tokenInFocus {
+			if s.tokensInFocus > 1 {
+				ctx.Text("You can pick up these phrases with [E].")
+			} else if s.tokensInFocus == 1 {
 				ctx.Text("You can pick up this phrase with [E].")
 			}
 		})
@@ -141,7 +139,7 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 
 	s.camera.Follow(s.player, float64(winW), float64(winH))
 
-	s.tokenInFocus = false
+	s.tokensInFocus = 0
 	radius := s.player.PivotRadius()
 	nearestIdx, nearestDistance := -1, 999.0
 	for idx, t := range s.tokens {
@@ -156,7 +154,7 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 			if distance2 < nearestDistance {
 				nearestIdx, nearestDistance = idx, distance2
 			}
-			s.tokenInFocus = true
+			s.tokensInFocus++
 		} else {
 			t.SetFocus(false)
 		}
