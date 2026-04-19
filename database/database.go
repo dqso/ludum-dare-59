@@ -119,6 +119,9 @@ func NewQuestionsDatabase(csvData []byte) (*QuestionsDatabase, error) {
 }
 
 func (d *QuestionsDatabase) GetRandomQuestions(num int) []entity.Question {
+	if num == 0 {
+		return make([]entity.Question, 0)
+	}
 	list := make([]entity.Question, len(d.questions))
 	for i, q := range d.questions {
 		list[i] = q
@@ -133,6 +136,9 @@ func (d *QuestionsDatabase) GetRandomQuestions(num int) []entity.Question {
 }
 
 func (d *QuestionsDatabase) GetRandomAnswers(num int) []entity.Answer {
+	if num == 0 {
+		return make([]entity.Answer, 0)
+	}
 	list := make([]entity.Answer, len(d.answers))
 	for i, a := range d.answers {
 		list[i] = a
@@ -153,7 +159,7 @@ func (d *QuestionsDatabase) Match(question entity.Question, answer entity.Answer
 	}
 	a, ok := qa.byAnswers[answer.Answer()]
 	if !ok {
-		return 0, fmt.Errorf("answer not found")
+		return 0, nil
 	}
 	return int(a.points), nil
 }

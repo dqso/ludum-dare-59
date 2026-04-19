@@ -2,6 +2,8 @@ package token
 
 import (
 	"image/color"
+	"log"
+	"time"
 
 	"github.com/dqso/ludum-dare-59/entity"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -20,19 +22,22 @@ type Token struct {
 	focused     bool
 	fontFace    font.Face
 	answer      entity.Answer
+	deadline    time.Time
 }
 
-func NewToken(fontFace font.Face, answer entity.Answer, x, y float64) *Token {
+func NewToken(fontFace font.Face, answer entity.Answer, x, y float64, lifetime time.Duration) *Token {
 	t := &Token{
 		x:        x,
 		y:        y,
 		fontFace: fontFace,
 		answer:   answer,
+		deadline: time.Now().Add(lifetime),
 	}
 	t.rebuildSprite()
 	t.w = float64(t.sprite.Bounds().Dx())
 	t.h = float64(t.sprite.Bounds().Dy())
 
+	log.Printf("Token %q(%s) has been created.", answer.Answer(), answer.Category())
 	return t
 }
 
@@ -46,6 +51,7 @@ func (t *Token) SetFocus(focus bool)      { t.focused = focus }
 func (t Token) IsFocused() bool           { return t.focused }
 func (t *Token) SetPosition(x, y float64) { t.x = x; t.y = y }
 func (t Token) Answer() entity.Answer     { return t.answer }
+func (t Token) Deadline() time.Time       { return t.deadline }
 
 func (t *Token) Draw(screen *ebiten.Image, op *ebiten.DrawImageOptions) {
 	if t.lastFocused != t.focused {

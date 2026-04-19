@@ -1,5 +1,7 @@
 package entity
 
+import "time"
+
 type Token interface {
 	Positionable
 	TopLeftGetter
@@ -11,6 +13,7 @@ type Token interface {
 	IsFocused() bool
 	Collect() CollectedToken
 	Answer() Answer
+	Deadline() time.Time
 }
 
 type CollectedToken interface {

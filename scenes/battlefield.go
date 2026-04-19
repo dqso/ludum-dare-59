@@ -7,6 +7,7 @@ import (
 	"math"
 	"math/rand/v2"
 	"strconv"
+	"time"
 
 	"github.com/dqso/ludum-dare-59/assets"
 	"github.com/dqso/ludum-dare-59/character"
@@ -26,6 +27,10 @@ type battlefieldScene struct {
 	game      entity.Game
 	questions entity.QuestionsDatabase
 	fontFace  font.Face
+
+	gameStart            time.Time
+	nextTokenSpawn       time.Time
+	nextInterviewerSpawn time.Time
 
 	player     entity.Player
 	camera     Camera
@@ -56,6 +61,24 @@ func (c *Camera) Follow(target entity.Positionable, winW, winH float64) {
 	}
 }
 
+const (
+	maxSpawnDistance = 500.0
+
+	tokenPoolSize       = 10
+	tokenSpawnBatchSize = 3
+	tokenSpawnDelayFrom = time.Second * 20
+	tokenSpawnDelayTo   = time.Second * 30
+	tokenLifetimeFrom   = time.Second * 50
+	tokenLifetimeTo     = time.Second * 70
+
+	interviewerRecruiterPoolSize = 4
+	interviewerSpawnBatchSize    = 1
+	interviewerSpawnDelayFrom    = time.Second * 60
+	interviewerSpawnDelayTo      = time.Second * 90
+	interviewerLifetimeFrom      = time.Minute * 3
+	interviewerLifetimeTo        = time.Minute * 4
+)
+
 func NewBattlefieldScene(game entity.Game, questions entity.QuestionsDatabase) entity.Scene {
 	winW, winH := game.WindowSize()
 
@@ -81,36 +104,79 @@ func NewBattlefieldScene(game entity.Game, questions entity.QuestionsDatabase) e
 		return NewErrorScene(game, err)
 	}
 
-	tokens := make([]entity.Token, 0)
-	//for _, a := range append(append(append(append(append(append(append(append(append(append(questions.GetRandomAnswers(300), questions.GetRandomAnswers(300)...), questions.GetRandomAnswers(300)...), questions.GetRandomAnswers(300)...), questions.GetRandomAnswers(300)...), questions.GetRandomAnswers(300)...), questions.GetRandomAnswers(300)...), questions.GetRandomAnswers(300)...), questions.GetRandomAnswers(300)...), questions.GetRandomAnswers(300)...), questions.GetRandomAnswers(300)...) {
-	for _, a := range questions.GetRandomAnswers(300) {
-		tokens = append(tokens, token.NewToken(fontFace, a, float64(rand.IntN(800)-400), float64(rand.IntN(600)-300)))
-	}
-
-	characters := make([]entity.Character, 0)
-	c, err := character.NewCharacter(entity.CharacterRoleRecruiter, 30, 40, questions.GetRandomQuestions(3))
-	if err != nil {
-		return NewErrorScene(game, err)
-	}
-	characters = append(characters, c)
-
+	now := time.Now()
 	return &battlefieldScene{
 		game:      game,
 		questions: questions,
 		fontFace:  fontFace,
 
+		gameStart:            now,
+		nextTokenSpawn:       now,
+		nextInterviewerSpawn: now,
+
 		player:     player,
 		camera:     camera,
-		characters: characters,
-		tokens:     tokens,
+		characters: make([]entity.Character, 0),
+		tokens:     make([]entity.Token, 0),
 	}
 }
 
 func (s *battlefieldScene) Update() (entity.Scene, error) {
+	for i := len(s.characters) - 1; i >= 0; i-- {
+		if time.Since(s.characters[i].Deadline()) > 0 {
+			s.characters = append(s.characters[:i], s.characters[i+1:]...)
+		}
+	}
+	for i := len(s.tokens) - 1; i >= 0; i-- {
+		if time.Since(s.tokens[i].Deadline()) > 0 {
+			s.tokens = append(s.tokens[:i], s.tokens[i+1:]...)
+		}
+	}
+	if time.Since(s.nextTokenSpawn) > 0 {
+		s.nextTokenSpawn = time.Now().Add(randDuration(tokenSpawnDelayFrom, tokenSpawnDelayTo))
+		tokensToSpawn := min(
+			max(tokenPoolSize-len(s.tokens), 0),
+			tokenSpawnBatchSize,
+		)
+		for _, a := range s.questions.GetRandomAnswers(tokensToSpawn) {
+			t := token.NewToken(s.fontFace, a,
+				float64(rand.IntN(maxSpawnDistance*2)-maxSpawnDistance),
+				float64(rand.IntN(maxSpawnDistance*2)-maxSpawnDistance),
+				randDuration(tokenLifetimeFrom, tokenLifetimeTo),
+			)
+			s.tokens = append(s.tokens, t)
+		}
+	}
+	if time.Since(s.nextInterviewerSpawn) > 0 {
+		s.nextInterviewerSpawn = time.Now().Add(randDuration(interviewerSpawnDelayFrom, interviewerSpawnDelayTo))
+		var numRecruiters int
+		for _, c := range s.characters {
+			if c.Role() == entity.CharacterRoleRecruiter {
+				numRecruiters++
+			}
+		}
+		interviewersToSpawn := min(
+			max(interviewerRecruiterPoolSize-numRecruiters, 0),
+			interviewerSpawnBatchSize,
+		)
+		for range interviewersToSpawn {
+			c, err := character.NewCharacter(entity.CharacterRoleRecruiter,
+				float64(rand.IntN(maxSpawnDistance*2)-maxSpawnDistance),
+				float64(rand.IntN(maxSpawnDistance*2)-maxSpawnDistance),
+				s.questions.GetRandomQuestions(3),
+				randDuration(interviewerLifetimeFrom, interviewerLifetimeTo),
+			)
+			if err != nil {
+				return NewErrorScene(s.game, err), nil
+			}
+			s.characters = append(s.characters, c)
+		}
+	}
 	if _, err := s.debug.Update(func(ctx *debugui.Context) error {
 		const x, y = 10, 80
 		ctx.Window("TODO", image.Rect(x, y, x+250, y+140), func(layout debugui.ContainerLayout) {
 			ctx.Text(fmt.Sprintf("FPS: %0.2f; TPS: %0.2f", ebiten.ActualFPS(), ebiten.ActualTPS()))
+			ctx.Text(fmt.Sprintf("%s", time.Now().Format(time.Kitchen)))
 
 			//cx, cy := ebiten.CursorPosition()
 			//ctx.Text(fmt.Sprintf("Point Pos: (%d; %d)", cx, cy))
@@ -372,4 +438,8 @@ var whiteImage *ebiten.Image
 func init() {
 	whiteImage = ebiten.NewImage(3, 3)
 	whiteImage.Fill(color.White)
+}
+
+func randDuration(from, to time.Duration) time.Duration {
+	return from + time.Duration(rand.Int64N(int64(to-from)))
 }

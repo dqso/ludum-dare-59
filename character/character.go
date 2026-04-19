@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"image"
 	"log"
+	"time"
 
 	"github.com/dqso/ludum-dare-59/assets"
 	"github.com/dqso/ludum-dare-59/entity"
@@ -23,9 +24,10 @@ type Character struct {
 	focused        bool
 	questions      []entity.Question
 	pointsToPlayer int
+	deadline       time.Time
 }
 
-func NewCharacter(role entity.CharacterRole, x, y float64, questions []entity.Question) (*Character, error) {
+func NewCharacter(role entity.CharacterRole, x, y float64, questions []entity.Question, lifetime time.Duration) (*Character, error) {
 	var asset []byte
 	switch role {
 	case entity.CharacterRoleRecruiter:
@@ -51,6 +53,9 @@ func NewCharacter(role entity.CharacterRole, x, y float64, questions []entity.Qu
 	op.GeoM.Scale(scale, scale)
 	sprite.DrawImage(src, op)
 
+	if lifetime == 0 {
+		lifetime = time.Hour * 24 * 256 * 5
+	}
 	c := &Character{
 		x:         0,
 		y:         0,
@@ -62,6 +67,7 @@ func NewCharacter(role entity.CharacterRole, x, y float64, questions []entity.Qu
 		sprite:    sprite,
 		role:      role,
 		questions: questions,
+		deadline:  time.Now().Add(lifetime),
 	}
 	c.Move(x, y)
 
@@ -84,6 +90,7 @@ func (c Character) Width() float64       { return c.w }
 func (c Character) Height() float64      { return c.h }
 func (c *Character) SetFocus(focus bool) { c.focused = focus }
 func (c Character) IsFocused() bool      { return c.focused }
+func (c Character) Deadline() time.Time  { return c.deadline }
 
 func (c *Character) Move(dx, dy float64) {
 	c.x += dx

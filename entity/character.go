@@ -1,5 +1,7 @@
 package entity
 
+import "time"
+
 type Character interface {
 	Positionable
 	TopLeftGetter
@@ -13,6 +15,7 @@ type Character interface {
 	IsFocused() bool
 	GetQuestion() Question
 	AnswerTheQuestion(questionsDatabase QuestionsDatabase, answer Answer)
+	Deadline() time.Time
 }
 
 type CharacterRole string
