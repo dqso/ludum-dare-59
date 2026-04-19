@@ -3,6 +3,7 @@ package token
 import (
 	"image/color"
 
+	"github.com/dqso/ludum-dare-59/entity"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -37,14 +38,15 @@ func NewToken(fontFace font.Face, str string, x, y float64, clr color.Color) *To
 	return t
 }
 
-func (t Token) X() float64           { return t.x }
-func (t Token) Y() float64           { return t.y }
-func (t Token) Width() float64       { return t.w }
-func (t Token) Height() float64      { return t.h }
-func (t Token) TopLeftX() float64    { return t.x - t.w/2 }
-func (t Token) TopLeftY() float64    { return t.y - t.h/2 }
-func (t *Token) SetFocus(focus bool) { t.focused = focus }
-func (t Token) IsFocused() bool      { return t.focused }
+func (t Token) X() float64                { return t.x }
+func (t Token) Y() float64                { return t.y }
+func (t Token) Width() float64            { return t.w }
+func (t Token) Height() float64           { return t.h }
+func (t Token) TopLeftX() float64         { return t.x - t.w/2 }
+func (t Token) TopLeftY() float64         { return t.y - t.h/2 }
+func (t *Token) SetFocus(focus bool)      { t.focused = focus }
+func (t Token) IsFocused() bool           { return t.focused }
+func (t *Token) SetPosition(x, y float64) { t.x = x; t.y = y }
 
 func (t *Token) Draw(screen *ebiten.Image, op *ebiten.DrawImageOptions) {
 	if t.lastFocused != t.focused {
@@ -98,4 +100,19 @@ func (t *Token) rebuildSprite() {
 	opts.GeoM.Translate(float64(-rect.Min.X)+padding, float64(-rect.Min.Y)+padding)
 	text.DrawWithOptions(sprite, t.str, t.fontFace, &opts)
 	t.sprite = sprite
+}
+
+type CollectedToken struct {
+	entity.Token
+}
+
+func (t *Token) Collect() entity.CollectedToken {
+	return &CollectedToken{
+		Token: t,
+	}
+}
+
+func (t *CollectedToken) Drop(x, y float64) entity.Token {
+	t.Token.SetPosition(x, y)
+	return t.Token
 }

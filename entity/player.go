@@ -17,6 +17,10 @@ type SizeGetter interface {
 	Height() float64
 }
 
+type PositionSetter interface {
+	SetPosition(x, y float64)
+}
+
 type PivotGetter interface {
 	PivotX() float64
 	PivotY() float64

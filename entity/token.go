@@ -5,7 +5,15 @@ type Token interface {
 	TopLeftGetter
 	SizeGetter
 	Drawable
+	PositionSetter
 
 	SetFocus(focus bool)
 	IsFocused() bool
+	Collect() CollectedToken
+}
+
+type CollectedToken interface {
+	SizeGetter
+	Drawable
+	Drop(x, y float64) Token
 }

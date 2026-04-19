@@ -27,6 +27,7 @@ func run() int {
 	g := game.New(ctx)
 
 	ebiten.SetWindowSize(windowWidth, windowHeight)
+	ebiten.SetWindowResizingMode(ebiten.WindowResizingModeOnlyFullscreenEnabled)
 	ebiten.SetWindowTitle("Game for Ludum Dare 59")
 
 	if err := ebiten.RunGame(g); err != nil {
