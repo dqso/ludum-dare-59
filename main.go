@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	windowWidth  = 800
-	windowHeight = 600
+	windowWidth  = 1024
+	windowHeight = 768
 )
 
 func main() {

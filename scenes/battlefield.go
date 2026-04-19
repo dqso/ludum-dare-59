@@ -40,36 +40,57 @@ type battlefieldScene struct {
 
 	nearestCharacterIdx int
 	tokensInFocus       int
+	offscreenSignals    []offscreenSignal
 
 	debug debugui.DebugUI
 }
+
+type offscreenSignal struct {
+	color      color.Color
+	signalType SignalType
+	x, y       float64
+	angle      float64
+}
+
+type SignalType uint8
+
+const (
+	SignalTypeToken SignalType = iota
+	SignalTypeInterviewer
+)
 
 type Camera struct {
 	X, Y float64
 }
 
+const (
+	coeffScreenXToMove = 0.4
+	coeffScreenYToMove = 0.4
+)
+
 func (c *Camera) Follow(target entity.Positionable, winW, winH float64) {
-	if x := target.X() - c.X; x < winW/4 {
-		c.X = target.X() - winW/4
-	} else if x > winW*3/4 {
-		c.X = target.X() - winW*3/4
+	if x := target.X() - c.X; x < winW*coeffScreenXToMove {
+		c.X = target.X() - winW*coeffScreenXToMove
+	} else if x > winW*(1-coeffScreenXToMove) {
+		c.X = target.X() - winW*(1-coeffScreenXToMove)
 	}
-	if y := target.Y() - c.Y; y < winH/4 {
-		c.Y = target.Y() - winH/4
-	} else if y > winH*3/4 {
-		c.Y = target.Y() - winH*3/4
+	if y := target.Y() - c.Y; y < winH*coeffScreenYToMove {
+		c.Y = target.Y() - winH*coeffScreenYToMove
+	} else if y > winH*(1-coeffScreenYToMove) {
+		c.Y = target.Y() - winH*(1-coeffScreenYToMove)
 	}
 }
 
 const (
 	maxSpawnDistance = 500.0
 
-	tokenPoolSize       = 10
-	tokenSpawnBatchSize = 3
-	tokenSpawnDelayFrom = time.Second * 20
-	tokenSpawnDelayTo   = time.Second * 30
-	tokenLifetimeFrom   = time.Second * 50
-	tokenLifetimeTo     = time.Second * 70
+	tokenPoolSize           = 20
+	tokenSpawnBatchSizeFrom = 2
+	tokenSpawnBatchSizeTo   = 5
+	tokenSpawnDelayFrom     = time.Second * 20
+	tokenSpawnDelayTo       = time.Second * 30
+	tokenLifetimeFrom       = time.Second * 50
+	tokenLifetimeTo         = time.Second * 70
 
 	interviewerRecruiterPoolSize = 4
 	interviewerSpawnBatchSize    = 1
@@ -136,7 +157,7 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 		s.nextTokenSpawn = time.Now().Add(randDuration(tokenSpawnDelayFrom, tokenSpawnDelayTo))
 		tokensToSpawn := min(
 			max(tokenPoolSize-len(s.tokens), 0),
-			tokenSpawnBatchSize,
+			tokenSpawnBatchSizeFrom+rand.IntN(tokenSpawnBatchSizeTo-tokenSpawnBatchSizeFrom),
 		)
 		for _, a := range s.questions.GetRandomAnswers(tokensToSpawn) {
 			t := token.NewToken(s.fontFace, a,
@@ -301,6 +322,46 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 		}
 	}
 
+	winW64, winH64 := float64(winW), float64(winH)
+	s.offscreenSignals = s.offscreenSignals[:0]
+	newOffscreenSignal := func(obj interface {
+		entity.Positionable
+		entity.TopLeftGetter
+		entity.SizeGetter
+	}, signalType SignalType, clr color.Color) (offscreenSignal, bool) {
+		if obj.TopLeftX() < s.camera.X+winW64 && obj.TopLeftX()+obj.Width() > s.camera.X &&
+			obj.TopLeftY() < s.camera.Y+winH64 && obj.TopLeftY()+obj.Height() > s.camera.Y {
+			return offscreenSignal{}, false
+		}
+		tx := obj.X() - s.camera.X
+		ty := obj.Y() - s.camera.Y
+		cx, cy := winW64/2, winH64/2
+		dx, dy := tx-cx, ty-cy
+		const margin = 10.0
+		scaleX := (winW64/2 - margin) / math.Abs(dx)
+		scaleY := (winH64/2 - margin) / math.Abs(dy)
+		sc := math.Min(scaleX, scaleY)
+		return offscreenSignal{
+			color:      clr,
+			signalType: signalType,
+			x:          cx + dx*sc,
+			y:          cy + dy*sc,
+			angle:      math.Atan2(dy, dx),
+		}, true
+	}
+	for _, t := range s.tokens {
+		sig, ok := newOffscreenSignal(t, SignalTypeToken, entity.AnswerCategoryToColor(t.Answer().Category()))
+		if ok {
+			s.offscreenSignals = append(s.offscreenSignals, sig)
+		}
+	}
+	for _, c := range s.characters {
+		sig, ok := newOffscreenSignal(c, SignalTypeInterviewer, colornames.Darkred)
+		if ok {
+			s.offscreenSignals = append(s.offscreenSignals, sig)
+		}
+	}
+
 	return nil, nil
 }
 
@@ -329,6 +390,15 @@ func (s *battlefieldScene) Draw(screen *ebiten.Image) {
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Translate(s.player.TopLeftX()-s.camera.X, s.player.TopLeftY()-s.camera.Y)
 	s.player.Draw(screen, op)
+
+	for _, signal := range s.offscreenSignals {
+		switch signal.signalType {
+		case SignalTypeToken:
+			vector.DrawFilledCircle(screen, float32(signal.x), float32(signal.y), 3, signal.color, true)
+		case SignalTypeInterviewer:
+			drawChevronSignal(screen, signal.x, signal.y, signal.angle, signal.color)
+		}
+	}
 
 	slotWidth := float64(winW) / float64(len(s.inventory))
 	for idx, ct := range s.inventory {
@@ -367,6 +437,41 @@ func (s *battlefieldScene) Draw(screen *ebiten.Image) {
 }
 
 func (s *battlefieldScene) Name() string { return "Battlefield" }
+
+func drawChevronSignal(screen *ebiten.Image, x, y, angle float64, clr color.Color) {
+	const size = 7.0
+	const gap = 6.0
+	const thickness = 2.0
+
+	cos, sin := math.Cos(angle), math.Sin(angle)
+	rotate := func(px, py float64) (float32, float32) {
+		return float32(x + px*cos - py*sin), float32(y + px*sin + py*cos)
+	}
+
+	r, g, b, a := clr.RGBA()
+	vclr := color.RGBA{R: uint8(r >> 8), G: uint8(g >> 8), B: uint8(b >> 8), A: uint8(a >> 8)}
+
+	for i := range 2 {
+		ox := -float64(i) * gap
+		x1, y1 := rotate(ox-size, -size)
+		x2, y2 := rotate(ox, 0)
+		x3, y3 := rotate(ox-size, size)
+
+		var p vector.Path
+		p.MoveTo(x1, y1)
+		p.LineTo(x2, y2)
+		p.LineTo(x3, y3)
+		vs, is := p.AppendVerticesAndIndicesForStroke(nil, nil, &vector.StrokeOptions{Width: thickness})
+		for j := range vs {
+			vs[j].SrcX, vs[j].SrcY = 1, 1
+			vs[j].ColorR = float32(vclr.R) / 255
+			vs[j].ColorG = float32(vclr.G) / 255
+			vs[j].ColorB = float32(vclr.B) / 255
+			vs[j].ColorA = float32(vclr.A) / 255
+		}
+		screen.DrawTriangles(vs, is, whiteImage, &ebiten.DrawTrianglesOptions{AntiAlias: true})
+	}
+}
 
 func drawSpeechBubble(screen *ebiten.Image, face font.Face, txt string, tipX, tipY float64) {
 	const pad = 10.0
