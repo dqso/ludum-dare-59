@@ -28,6 +28,7 @@ const (
 	AnswerCategoryBinary    AnswerCategory = "binary"    // бинарные
 	AnswerCategoryFrequency AnswerCategory = "frequency" // частотные
 	AnswerCategoryEmotional AnswerCategory = "emotional" // эмоциональные
+	AnswerCategoryQuantity  AnswerCategory = "quantity"  // количество или время
 )
 
 func AnswerCategoryToColor(_type AnswerCategory) color.Color {
@@ -40,6 +41,8 @@ func AnswerCategoryToColor(_type AnswerCategory) color.Color {
 		return colornames.Honeydew
 	case AnswerCategoryEmotional:
 		return colornames.Purple
+	case AnswerCategoryQuantity:
+		return colornames.Gold
 	default:
 		return colornames.Red
 	}
@@ -51,6 +54,7 @@ func (t AnswerCategory) IsValid() bool {
 	case AnswerCategoryBinary:
 	case AnswerCategoryFrequency:
 	case AnswerCategoryEmotional:
+	case AnswerCategoryQuantity:
 	default:
 		return false
 	}
