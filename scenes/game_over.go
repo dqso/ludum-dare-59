@@ -7,6 +7,7 @@ import (
 	"image"
 	"image/color"
 	_ "image/png"
+	"time"
 
 	"github.com/dqso/ludum-dare-59/assets"
 	"github.com/dqso/ludum-dare-59/entity"
@@ -28,13 +29,12 @@ type gameOverScene struct {
 	questions  entity.QuestionsForInterview
 	next       entity.Scene
 
-	whiteSub        *ebiten.Image
-	model           *primitive.Model
-	tris            []Tri
-	trisCh          chan Tri
-	bg              color.NRGBA
-	imgW, imgH      int
-	cancelGoroutine context.CancelFunc
+	whiteSub   *ebiten.Image
+	model      *primitive.Model
+	tris       []Tri
+	stepsLeft  int
+	bg         color.NRGBA
+	imgW, imgH int
 }
 
 type Tri struct {
@@ -177,43 +177,13 @@ func NewGameOverScene(ctx context.Context, game entity.Game, fontFace10 font.Fac
 
 	b := src.Bounds()
 	bg := primitive.MakeColor(primitive.AverageImageColor(src))
-	outputSize := b.Max.X
-	model := primitive.NewModel(src, bg, outputSize, 4)
+	model := primitive.NewModel(src, bg, 256, 4)
 
 	s.model = model
 	s.bg = bg.NRGBA()
-	s.trisCh = make(chan Tri, steps)
+	s.stepsLeft = steps
 	s.imgW = b.Max.X
 	s.imgH = b.Max.Y
-
-	goroutineCtx, cancel := context.WithCancel(ctx)
-	s.cancelGoroutine = cancel
-
-	go func(ctx context.Context) {
-		defer close(s.trisCh)
-		for i := 0; i < steps; i++ {
-			model.Step(primitive.ShapeTypeTriangle, 128, 0)
-			shape := model.Shapes[len(model.Shapes)-1]
-			t, ok := shape.(*primitive.Triangle)
-			if !ok {
-				continue
-			}
-			c := model.Colors[len(model.Colors)-1]
-			select {
-			case s.trisCh <- Tri{
-				x0: float32(t.X1), y0: float32(t.Y1),
-				x1: float32(t.X2), y1: float32(t.Y2),
-				x2: float32(t.X3), y2: float32(t.Y3),
-				r: float32(c.R) / 255,
-				g: float32(c.G) / 255,
-				b: float32(c.B) / 255,
-				a: float32(c.A) / 255,
-			}:
-			case <-ctx.Done():
-				return
-			}
-		}
-	}(goroutineCtx)
 
 	return s
 }
@@ -221,21 +191,29 @@ func NewGameOverScene(ctx context.Context, game entity.Game, fontFace10 font.Fac
 func (s *gameOverScene) Update() (entity.Scene, error) {
 	s.ui.Update()
 	if s.next != nil {
-		s.cancelGoroutine()
 		return s.next, nil
 	}
 
-	for {
-		select {
-		case t, ok := <-s.trisCh:
-			if !ok {
-				return nil, nil
-			}
-			s.tris = append(s.tris, t)
-		default:
-			return nil, nil
+	deadline := time.Now().Add(8 * time.Millisecond)
+	for s.stepsLeft > 0 && time.Now().Before(deadline) {
+		s.model.Step(primitive.ShapeTypeTriangle, 128, 0)
+		s.stepsLeft--
+		shape := s.model.Shapes[len(s.model.Shapes)-1]
+		if t, ok := shape.(*primitive.Triangle); ok {
+			c := s.model.Colors[len(s.model.Colors)-1]
+			s.tris = append(s.tris, Tri{
+				x0: float32(t.X1), y0: float32(t.Y1),
+				x1: float32(t.X2), y1: float32(t.Y2),
+				x2: float32(t.X3), y2: float32(t.Y3),
+				r: float32(c.R) / 255,
+				g: float32(c.G) / 255,
+				b: float32(c.B) / 255,
+				a: float32(c.A) / 255,
+			})
 		}
 	}
+
+	return nil, nil
 }
 
 func (s *gameOverScene) Draw(screen *ebiten.Image) {
