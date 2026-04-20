@@ -1,19 +1,34 @@
-answer,category,"Do you have experience working in a team?","Have you ever hidden bugs from your team?","Are you ready to work overtime?","Have you used production for testing?","Have you taken tasks you didn't know how to do?","Have you admitted you didn't know the answer?","Have you worked with people who made your job harder?","Have you taken responsibility for someone else's mistake?","Have you said no to your manager?","Have you taken a task knowing you wouldn't finish on time?","Have you criticized decisions in public?","Have you recommended a colleague you didn't trust?","Have you restarted a server instead of investigating the issue?","Have you worked two jobs at the same time?","Have you returned to a company you left before?","Have you left a job without giving two weeks' notice?","Have you discussed salary openly with your team?","Have you helped find your own replacement before leaving?","Have you handed over your work properly when leaving?","Do you handle team conflicts easily?","Are you ready for a team lead role?","Are you ready to relocate for work?","Are you ready to take on a mentor role?","Do you want to move into management?","Are you ready to start a project from scratch?","Do you enjoy working with legacy code?","Do you enjoy manual testing?","Are you ready for on-call night shifts?","Do you enjoy writing documentation?","Can you handle repetitive tasks?","Are you ready to work on weekends?","Are you ready for frequent business trips?","Are you ready to take calls after work hours?","Are you ready to take tasks without technical specs?","Can you tolerate micromanagement?","Are you ready to help with hiring new employees?"
-I don't know,evasive,-2,-2,-2,-1,-2,-3,-1,-2,-2,-2,-1,-1,-1,-1,-1,-1,-2,-2,-2,-2,-2,-2,-2,-2,-2,-1,-1,-2,-2,-2,-2,-2,-2,-2,-1,-2
-hard to say,evasive,-2,-3,-2,-2,-2,-3,-1,-2,-2,-2,-2,-2,-2,-1,-1,-2,-2,-2,-2,-3,-2,-3,-2,-2,-3,-2,-1,-2,-2,-2,-2,-2,-2,-2,-1,-2
-it depends,evasive,-1,-2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,-1,1,-1,1,1,1,-1,1,1,1,1,1,-1,-1
-I'll think about it,evasive,-3,-4,-3,-2,-3,-4,-2,-3,-3,-3,-2,-2,-2,-2,-2,-2,-3,-3,-3,-3,-3,-2,-3,-2,-3,-2,-2,-2,-3,-2,-2,-2,-2,-3,-2,-2
-probably,evasive,-2,-2,-2,-2,-2,-2,-1,-2,-2,-2,-2,-2,-2,-1,-1,-2,-2,-2,-2,-1,-1,1,-1,1,-1,1,1,-1,-1,-1,-1,1,-1,-1,-2,-1
-yes,yes,5,-8,5,-5,7,8,3,6,7,-6,-5,-8,-5,-6,4,-8,5,8,9,8,7,6,8,6,8,5,4,5,8,6,5,6,4,7,-3,7
-no,no,-5,7,-3,5,-4,-6,1,-3,-4,7,6,8,6,5,0,8,-2,-5,-7,-7,-4,-3,-5,-2,-4,-2,-1,-3,-4,-4,-3,-2,-2,-4,3,-3
-yeah,yes,4,-7,4,-4,6,7,2,5,6,-5,-4,-7,-4,-5,3,-7,4,7,8,7,6,5,7,5,7,4,3,4,7,5,4,5,3,6,-2,6
-nope,no,-4,6,-2,4,-3,-5,0,-2,-3,6,5,7,5,4,-1,7,-1,-4,-6,-6,-3,-2,-4,-1,-3,-1,0,-2,-3,-3,-2,-1,-1,-3,2,-2
-sometimes,frequency,2,-4,3,-2,4,4,2,3,4,-3,-2,-4,-3,-3,2,-4,3,4,4,3,3,2,3,3,3,3,2,3,3,3,3,3,3,3,-1,3
-always,frequency,8,-9,-3,-8,8,9,-2,7,6,-8,-7,-9,-7,-7,1,-9,6,7,9,9,8,7,9,7,9,4,3,4,9,7,3,6,3,7,-5,8
-it happens,frequency,2,-3,2,-2,3,3,1,2,3,-3,-2,-4,-3,-2,1,-3,2,3,3,2,2,2,2,2,3,2,1,2,2,2,2,2,2,2,-1,2
-by agreement,frequency,-1,-3,6,-1,2,1,1,2,4,-1,-2,-2,-2,-1,2,-2,3,3,4,1,3,5,3,2,4,2,2,6,3,2,6,5,6,3,-2,4
-not ideal,frequency,-3,1,0,1,-2,-2,-1,-3,-2,2,1,1,1,1,-1,2,-2,-3,-3,-4,-3,-3,-4,-3,-3,-3,-3,-2,-4,-3,-2,-3,-2,-4,3,-3
-never,frequency,-7,9,-2,8,-6,-5,0,-4,-5,8,7,8,7,6,0,8,-4,-6,-7,-8,-6,-5,-7,-5,-6,-4,-3,-5,-6,-5,-5,-4,-4,-6,4,-5
-not my thing,emotional,-5,2,-5,2,-5,-4,-3,-5,-3,3,2,2,2,2,-1,2,-3,-5,-5,-5,-5,-4,-5,-5,-5,-4,-4,-4,-5,-4,-4,-4,-3,-4,3,-4
-for extra pay,emotional,-2,-4,1,-3,-3,-4,-2,-4,-3,-3,-3,-5,-2,0,-2,-3,-2,-2,-2,-4,-3,1,-3,-3,-2,-2,-2,3,-3,-2,3,1,2,-2,-2,-2
-it gets in the way,emotional,-6,2,-5,1,-4,-4,1,-4,-3,2,-3,-3,-1,-3,-2,-2,-3,-4,-5,-6,-5,-5,-5,-5,-5,-5,-4,-5,-5,-5,-5,-5,-4,-5,3,-4
+answer,category,"Do you have experience working in a team?","Have you ever hidden bugs from your team?","Are you ready to work overtime?","Have you used production for testing?","Have you taken tasks you didn't know how to do?","Have you admitted you didn't know the answer?","Have you worked with people who made your job harder?","Have you taken responsibility for someone else's mistake?","Have you said no to your manager?","Have you taken a task knowing you wouldn't finish on time?","Have you criticized decisions in public?","Have you recommended a colleague you didn't trust?","Have you restarted a server instead of investigating the issue?","Have you worked two jobs at the same time?","Have you returned to a company you left before?","Have you left a job without giving two weeks' notice?","Have you discussed salary openly with your team?","Have you helped find your own replacement before leaving?","Have you handed over your work properly when leaving?","Do you handle team conflicts easily?","Are you ready for a team lead role?","Are you ready to relocate for work?","Are you ready to take on a mentor role?","Do you want to move into management?","Are you ready to start a project from scratch?","Do you enjoy working with legacy code?","Do you enjoy manual testing?","Are you ready for on-call night shifts?","Do you enjoy writing documentation?","Can you handle repetitive tasks?","Are you ready to work on weekends?","Are you ready for frequent business trips?","Are you ready to take calls after work hours?","Are you ready to take tasks without technical specs?","Can you tolerate micromanagement?","Are you ready to help with hiring new employees?","How long have you been at your current job?","How soon can you start a new job?","How long does a typical probation period take for you?","How long does your job search usually take?","How long do you usually need to make a decision on an offer?","How quickly do you fix a critical bug?","How long do you usually go without taking a vacation?","How long does it usually take to get a task approved?"
+I don't know,evasive,-2,-2,-2,-1,-2,-3,-1,-2,-2,-2,-1,-1,-1,-1,-1,-1,-2,-2,-2,-2,-2,-2,-2,-2,-2,-1,-1,-2,-2,-2,-2,-2,-2,-2,-1,-2,-3,-3,-3,-3,-3,-3,-3,-3
+hard to say,evasive,-2,-3,-2,-2,-2,-3,-1,-2,-2,-2,-2,-2,-2,-1,-1,-2,-2,-2,-2,-3,-2,-3,-2,-2,-3,-2,-1,-2,-2,-2,-2,-2,-2,-2,-1,-2,-3,-3,-3,-3,-3,-3,-3,-3
+it depends,evasive,-1,-2,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,1,-1,1,-1,1,1,1,-1,1,1,1,1,1,-1,-1,-2,-2,-2,-2,-2,-2,-2,-2
+I'll think about it,evasive,-3,-4,-3,-2,-3,-4,-2,-3,-3,-3,-2,-2,-2,-2,-2,-2,-3,-3,-3,-3,-3,-2,-3,-2,-3,-2,-2,-2,-3,-2,-2,-2,-2,-3,-2,-2,-4,-4,-4,-4,-4,-4,-4,-4
+probably,evasive,-2,-2,-2,-2,-2,-2,-1,-2,-2,-2,-2,-2,-2,-1,-1,-2,-2,-2,-2,-1,-1,1,-1,1,-1,1,1,-1,-1,-1,-1,1,-1,-1,-2,-1,-5,-5,-5,-5,-5,-5,-5,-5
+yes,yes,5,-8,5,-5,7,8,3,6,7,-6,-5,-8,-5,-6,4,-8,5,8,9,8,7,6,8,6,8,5,4,5,8,6,5,6,4,7,-3,7,-7,-7,-7,-7,-7,-7,-7,-7
+no,no,-5,7,-3,5,-4,-6,1,-3,-4,7,6,8,6,5,0,8,-2,-5,-7,-7,-4,-3,-5,-2,-4,-2,-1,-3,-4,-4,-3,-2,-2,-4,3,-3,-7,-7,-7,-7,-7,-7,-7,-7
+yeah,yes,4,-7,4,-4,6,7,2,5,6,-5,-4,-7,-4,-5,3,-7,4,7,8,7,6,5,7,5,7,4,3,4,7,5,4,5,3,6,-2,6,-7,-7,-7,-7,-7,-7,-7,-7
+nope,no,-4,6,-2,4,-3,-5,0,-2,-3,6,5,7,5,4,-1,7,-1,-4,-6,-6,-3,-2,-4,-1,-3,-1,0,-2,-3,-3,-2,-1,-1,-3,2,-2,-7,-7,-7,-7,-7,-7,-7,-7
+sometimes,frequency,2,-4,3,-2,4,4,2,3,4,-3,-2,-4,-3,-3,2,-4,3,4,4,3,3,2,3,3,3,3,2,3,3,3,3,3,3,3,-1,3,-7,-7,-7,-7,-7,-7,-7,-7
+always,frequency,8,-9,-3,-8,8,9,-2,7,6,-8,-7,-9,-7,-7,1,-9,6,7,9,9,8,7,9,7,9,4,3,4,9,7,3,6,3,7,-5,8,-8,-8,-8,-8,-8,-8,-8,-8
+it happens,frequency,2,-3,2,-2,3,3,1,2,3,-3,-2,-4,-3,-2,1,-3,2,3,3,2,2,2,2,2,3,2,1,2,2,2,2,2,2,2,-1,2,-7,-7,-7,-7,-7,-7,-7,-7
+by agreement,frequency,-1,-3,6,-1,2,1,1,2,4,-1,-2,-2,-2,-1,2,-2,3,3,4,1,3,5,3,2,4,2,2,6,3,2,6,5,6,3,-2,4,-3,-1,-2,-3,-2,-2,-3,-2
+not ideal,frequency,-3,1,0,1,-2,-2,-1,-3,-2,2,1,1,1,1,-1,2,-2,-3,-3,-4,-3,-3,-4,-3,-3,-3,-3,-2,-4,-3,-2,-3,-2,-4,3,-3,-6,-6,-6,-6,-6,-6,-6,-6
+never,frequency,-7,9,-2,8,-6,-5,0,-4,-5,8,7,8,7,6,0,8,-4,-6,-7,-8,-6,-5,-7,-5,-6,-4,-3,-5,-6,-5,-5,-4,-4,-6,4,-5,-8,-8,-8,-8,-8,-8,-8,-8
+not my thing,emotional,-5,2,-5,2,-5,-4,-3,-5,-3,3,2,2,2,2,-1,2,-3,-5,-5,-5,-5,-4,-5,-5,-5,-4,-4,-4,-5,-4,-4,-4,-3,-4,3,-4,-7,-7,-7,-7,-7,-7,-7,-7
+for extra pay,emotional,-2,-4,1,-3,-3,-4,-2,-4,-3,-3,-3,-5,-2,0,-2,-3,-2,-2,-2,-4,-3,1,-3,-3,-2,-2,-2,3,-3,-2,3,1,2,-2,-2,-2,-8,-8,-8,-8,-8,-8,-8,-8
+it gets in the way,emotional,-6,2,-5,1,-4,-4,1,-4,-3,2,-3,-3,-1,-3,-2,-2,-3,-4,-5,-6,-5,-5,-5,-5,-5,-5,-4,-5,-5,-5,-5,-5,-4,-5,3,-4,-8,-8,-8,-8,-8,-8,-8,-8
+right away,quantity,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-5,10,6,10,9,10,-5,9
+one hour,quantity,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-7,9,-7,8,8,9,-8,8
+two hours,quantity,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-7,9,-7,8,8,8,-8,7
+half a day,quantity,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-6,8,-6,7,7,7,-7,6
+one day,quantity,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-6,8,-5,7,6,5,-6,5
+two days,quantity,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-5,7,-4,6,5,2,-5,3
+three days,quantity,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-5,7,-3,6,4,0,-4,2
+one week,quantity,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-4,6,-2,5,2,-3,-2,0
+two weeks,quantity,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-3,4,2,4,0,-6,0,-3
+one month,quantity,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-1,1,6,3,-3,-8,3,-6
+three months,quantity,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,3,-3,8,1,-6,-9,6,-8
+six months,quantity,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,6,-6,5,-2,-8,-10,8,-9
+one year,quantity,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,8,-8,2,-5,-9,-10,7,-10
+a few years,quantity,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,10,-9,-3,-7,-10,-10,3,-10
+five years,quantity,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,-8,10,-10,-6,-9,-10,-10,-2,-10

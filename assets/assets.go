@@ -52,4 +52,7 @@ var (
 
 	//go:embed music3.mp3
 	Music3MP3 []byte
+
+	//go:embed notification.mp3
+	NotificationMP3 []byte
 )

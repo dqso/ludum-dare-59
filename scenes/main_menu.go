@@ -39,6 +39,7 @@ type mainMenuScene struct {
 	techInterviewBtn      *widget.Button
 	decreaseDifficultyBtn *widget.Button
 	musicVolumeBtn        *widget.Button
+	showFPSBtn            *widget.Button
 
 	next entity.Scene
 	quit bool
@@ -184,6 +185,11 @@ func NewMainMenuScene(ctx context.Context, game entity.Game, questions entity.Qu
 	})
 	optC.AddChild(s.musicVolumeBtn)
 
+	s.showFPSBtn = newButton(s.showFPSLabel(), func() {
+		s.options.ShowFPS = !s.options.ShowFPS
+	})
+	optC.AddChild(s.showFPSBtn)
+
 	optC.AddChild(newButton("Back", func() {
 		s.screen = mainMenuScreenMain
 	}))
@@ -262,6 +268,14 @@ func (s *mainMenuScene) decreaseDifficultyLabel() string {
 	return fmt.Sprintf("Decrease Difficulty [%s]", state)
 }
 
+func (s *mainMenuScene) showFPSLabel() string {
+	state := "off"
+	if s.options.ShowFPS {
+		state = "on"
+	}
+	return fmt.Sprintf("Show FPS [%s]", state)
+}
+
 func musicVolumeLevels() []float64 { return []float64{0, 0.1, 0.2, 0.5, 0.7, 1.0} }
 
 func (s *mainMenuScene) musicVolumeLabel() string {
@@ -297,6 +311,7 @@ func (s *mainMenuScene) Update() (entity.Scene, error) {
 		s.techInterviewBtn.Text().Label = s.techInterviewLabel()
 		s.decreaseDifficultyBtn.Text().Label = s.decreaseDifficultyLabel()
 		s.musicVolumeBtn.Text().Label = s.musicVolumeLabel()
+		s.showFPSBtn.Text().Label = s.showFPSLabel()
 		s.optionsUI.Update()
 
 	case mainMenuScreenHelp:

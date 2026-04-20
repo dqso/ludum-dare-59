@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"image"
 	"image/color"
 	"log"
 	"maps"
@@ -19,10 +18,10 @@ import (
 	"github.com/dqso/ludum-dare-59/entity"
 	"github.com/dqso/ludum-dare-59/player"
 	"github.com/dqso/ludum-dare-59/token"
-	"github.com/ebitengine/debugui"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/audio/mp3"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/shopspring/decimal"
@@ -65,15 +64,11 @@ type battlefieldScene struct {
 
 	stats entity.Stats
 
-	debug debugui.DebugUI
+	escMenuOpen bool
 
 	musicTracks  [][]byte
 	currentTrack int
 	musicPlayer  *audio.Player
-
-	bgImage   *ebiten.Image
-	bgCameraX float64
-	bgCameraY float64
 }
 
 type AnswerWithPoint struct {
@@ -135,10 +130,10 @@ const (
 	maxSpawnDistance = 1500.0
 
 	tokenPoolSize           = 80
-	tokenSpawnBatchSizeFrom = 15
-	tokenSpawnBatchSizeTo   = 25
-	tokenSpawnDelayFrom     = time.Second * 8
-	tokenSpawnDelayTo       = time.Second * 15
+	tokenSpawnBatchSizeFrom = 1
+	tokenSpawnBatchSizeTo   = 3
+	tokenSpawnDelayFrom     = time.Second * 1
+	tokenSpawnDelayTo       = time.Second * 2
 	tokenLifetimeFrom       = time.Second * 50
 	tokenLifetimeTo         = time.Second * 70
 
@@ -269,7 +264,7 @@ func NewBattlefieldScene(ctx context.Context, game entity.Game, questions entity
 
 		gameStart:            now,
 		nextTokenSpawn:       now,
-		nextInterviewerSpawn: now,
+		nextInterviewerSpawn: now.Add(time.Second * 3),
 
 		player:     player,
 		camera:     camera,
@@ -284,6 +279,21 @@ func NewBattlefieldScene(ctx context.Context, game entity.Game, questions entity
 		musicTracks:  musicTracks,
 		currentTrack: -1,
 	}
+}
+
+func (s *battlefieldScene) playNotification() {
+	decoded, err := mp3.DecodeWithSampleRate(globalAudioContext.SampleRate(), bytes.NewReader(assets.NotificationMP3))
+	if err != nil {
+		log.Printf("notification decode error: %v", err)
+		return
+	}
+	p, err := globalAudioContext.NewPlayer(decoded)
+	if err != nil {
+		log.Printf("notification player error: %v", err)
+		return
+	}
+	p.SetVolume(0.6)
+	p.Play()
 }
 
 func (s *battlefieldScene) playTrack(idx int) {
@@ -503,6 +513,7 @@ idleFor:
 				return NewErrorScene(s.ctx, s.game, err), nil
 			}
 			s.characters.Add(c)
+			s.playNotification()
 			msg := fmt.Sprintf(
 				"Hey, everyone! My name is %s.\nI represent %s.\nWe're looking for a developer to join us.",
 				firstName, company,
@@ -516,6 +527,21 @@ idleFor:
 
 	if ebiten.IsKeyPressed(ebiten.KeyF) && ebiten.IsKeyPressed(ebiten.KeyShift) {
 		ebiten.SetFullscreen(!ebiten.IsFullscreen())
+	}
+
+	if inpututil.IsKeyJustPressed(ebiten.KeyEscape) {
+		s.escMenuOpen = !s.escMenuOpen
+	}
+	if s.escMenuOpen && inpututil.IsMouseButtonJustReleased(ebiten.MouseButtonLeft) {
+		winW, winH := s.game.WindowSize()
+		mx, my := ebiten.CursorPosition()
+		btnX, btn1Y, btn2Y := escMenuButtonPositions(winW, winH)
+		switch {
+		case escMenuInRect(mx, my, btnX, btn1Y):
+			return NewMainMenuScene(s.ctx, s.game, s.questions, s.firstNames), nil
+		case escMenuInRect(mx, my, btnX, btn2Y):
+			s.escMenuOpen = false
+		}
 	}
 
 	step := s.player.Speed()
@@ -726,23 +752,11 @@ idleFor:
 		}
 	}
 
-	if _, err := s.debug.Update(func(ctx *debugui.Context) error {
-		const x, y = 10, 80
-		ctx.Window("TODO", image.Rect(x, y, x+250, y+140), func(layout debugui.ContainerLayout) {
-			ctx.Text(fmt.Sprintf("FPS: %0.2f; TPS: %0.2f", ebiten.ActualFPS(), ebiten.ActualTPS()))
-		})
-		return nil
-	}); err != nil {
-		return NewErrorScene(s.ctx, s.game, err), nil
-	}
-
 	return nil, nil
 }
 
 func (s *battlefieldScene) Draw(screen *ebiten.Image) {
-	//if s.bgCameraX != s.camera.X && s.bgCameraY != s.camera.Y {
 	drawBackground(screen, s.camera.X, s.camera.Y)
-	//}
 	winW, winH := s.game.WindowSize()
 
 	for _, t := range s.tokens {
@@ -820,7 +834,18 @@ func (s *battlefieldScene) Draw(screen *ebiten.Image) {
 	const hotbarH = 80 + 10 // barH + sideMargin
 	drawToasts(screen, s.stampatelloFaceto10, s.messages, float64(winW), float64(winH)-hotbarH)
 
-	s.debug.Draw(screen)
+	if s.options.ShowFPS {
+		fpsStr := fmt.Sprintf("%d", int(ebiten.ActualFPS()))
+		fpsBounds := text.BoundString(s.cascadiaMono14, fpsStr)
+		fpsOp := &ebiten.DrawImageOptions{}
+		fpsOp.GeoM.Translate(8-float64(fpsBounds.Min.X), 8-float64(fpsBounds.Min.Y))
+		fpsOp.ColorM.ScaleWithColor(color.NRGBA{R: 80, G: 80, B: 80, A: 160})
+		text.DrawWithOptions(screen, fpsStr, s.cascadiaMono14, fpsOp)
+	}
+
+	if s.escMenuOpen {
+		s.drawEscMenu(screen, winW, winH)
+	}
 }
 
 func (s *battlefieldScene) Name() string { return "Battlefield" }
@@ -1113,6 +1138,65 @@ func init() {
 
 func randDuration(from, to time.Duration) time.Duration {
 	return from + time.Duration(rand.Int64N(int64(to-from)))
+}
+
+const (
+	escMenuW      = 260.0
+	escMenuH      = 150.0
+	escMenuBtnW   = 200.0
+	escMenuBtnH   = 42.0
+	escMenuBtnGap = 12.0
+	escMenuPadTop = 18.0
+)
+
+func escMenuButtonPositions(winW, winH int) (btnX, btn1Y, btn2Y float64) {
+	panelX := (float64(winW) - escMenuW) / 2
+	panelY := (float64(winH) - escMenuH) / 2
+	btnX = panelX + (escMenuW-escMenuBtnW)/2
+	btn1Y = panelY + escMenuPadTop
+	btn2Y = btn1Y + escMenuBtnH + escMenuBtnGap
+	return
+}
+
+func escMenuInRect(mx, my int, bx, by float64) bool {
+	return float64(mx) >= bx && float64(mx) <= bx+escMenuBtnW &&
+		float64(my) >= by && float64(my) <= by+escMenuBtnH
+}
+
+func (s *battlefieldScene) drawEscMenu(screen *ebiten.Image, winW, winH int) {
+	vector.DrawFilledRect(screen, 0, 0, float32(winW), float32(winH), color.NRGBA{0, 0, 0, 140}, false)
+
+	panelX := (float64(winW) - escMenuW) / 2
+	panelY := (float64(winH) - escMenuH) / 2
+	vector.DrawFilledRect(screen, float32(panelX), float32(panelY), escMenuW, escMenuH, color.NRGBA{15, 15, 30, 245}, false)
+	vector.StrokeRect(screen, float32(panelX), float32(panelY), escMenuW, escMenuH, 1, color.NRGBA{80, 90, 140, 255}, false)
+
+	mx, my := ebiten.CursorPosition()
+	btnX, btn1Y, btn2Y := escMenuButtonPositions(winW, winH)
+
+	drawBtn := func(label string, by float64) {
+		hover := escMenuInRect(mx, my, btnX, by)
+		bg := color.NRGBA{40, 40, 65, 255}
+		border := color.NRGBA{100, 110, 160, 255}
+		if hover {
+			bg = color.NRGBA{65, 65, 100, 255}
+			border = color.NRGBA{160, 170, 220, 255}
+		}
+		vector.DrawFilledRect(screen, float32(btnX), float32(by), escMenuBtnW, escMenuBtnH, bg, false)
+		vector.StrokeRect(screen, float32(btnX), float32(by), escMenuBtnW, escMenuBtnH, 1, border, false)
+
+		bounds := text.BoundString(s.stampatelloFaceto14, label)
+		op := &ebiten.DrawImageOptions{}
+		op.GeoM.Translate(
+			btnX+(escMenuBtnW-float64(bounds.Dx()))/2-float64(bounds.Min.X),
+			by+(escMenuBtnH-float64(bounds.Dy()))/2-float64(bounds.Min.Y),
+		)
+		op.ColorM.ScaleWithColor(color.RGBA{200, 210, 255, 255})
+		text.DrawWithOptions(screen, label, s.stampatelloFaceto14, op)
+	}
+
+	drawBtn("Main Menu", btn1Y)
+	drawBtn("Resume", btn2Y)
 }
 
 func getSomeAnswers(grouped entity.AnswersGrouped, x, y float64) []AnswerWithPoint {
