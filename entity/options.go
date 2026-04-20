@@ -1,5 +1,6 @@
 package entity
 
 type GameOptions struct {
-	TechInterview bool
+	TechInterview      bool
+	DecreaseDifficulty bool
 }

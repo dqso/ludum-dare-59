@@ -3,7 +3,6 @@ package scenes
 import (
 	"context"
 	"fmt"
-	"image"
 	"image/color"
 	"log"
 	"maps"
@@ -33,8 +32,10 @@ type battlefieldScene struct {
 	game       entity.Game
 	questions  entity.QuestionsForInterview
 	firstNames entity.FirstNamesDatabase
-	fontFace10 font.Face
-	fontFace14 font.Face
+
+	stampatelloFaceto10 font.Face
+	stampatelloFaceto14 font.Face
+	cascadiaMono14      font.Face
 
 	gameStart            time.Time
 	nextTokenSpawn       time.Time
@@ -52,6 +53,8 @@ type battlefieldScene struct {
 
 	messages []Message
 	expenses []*Expense
+
+	options entity.GameOptions
 
 	stats entity.Stats
 
@@ -117,10 +120,10 @@ const (
 	maxSpawnDistance = 1500.0
 
 	tokenPoolSize           = 80
-	tokenSpawnBatchSizeFrom = 10
-	tokenSpawnBatchSizeTo   = 20
-	tokenSpawnDelayFrom     = time.Second * 10
-	tokenSpawnDelayTo       = time.Second * 20
+	tokenSpawnBatchSizeFrom = 15
+	tokenSpawnBatchSizeTo   = 25
+	tokenSpawnDelayFrom     = time.Second * 8
+	tokenSpawnDelayTo       = time.Second * 15
 	tokenLifetimeFrom       = time.Second * 50
 	tokenLifetimeTo         = time.Second * 70
 
@@ -136,6 +139,10 @@ const (
 	startedSalary    = 0
 	gameOverMoney    = -500.00
 	winnerMoney      = 10000.00
+
+	numRecruiterQuestions = 5
+	numEngineerQuestions  = 6
+	numFounderQuestions   = 3
 
 	coeffRealTime time.Duration = 12 * 24 * 30 // 5 минут = 1 месяц
 )
@@ -165,11 +172,11 @@ func NewBattlefieldScene(ctx context.Context, game entity.Game, questions entity
 		Y: player.Y() - float64(winH)/2,
 	}
 
-	tt, err := opentype.Parse(assets.StampatelloFacetoKernTTF)
+	stampatelloFaceto, err := opentype.Parse(assets.StampatelloFacetoKernTTF)
 	if err != nil {
 		return NewErrorScene(ctx, game, err)
 	}
-	fontFace10, err := opentype.NewFace(tt, &opentype.FaceOptions{
+	stampatelloFaceto10, err := opentype.NewFace(stampatelloFaceto, &opentype.FaceOptions{
 		Size:    float64(10),
 		DPI:     96,
 		Hinting: font.HintingFull,
@@ -177,13 +184,51 @@ func NewBattlefieldScene(ctx context.Context, game entity.Game, questions entity
 	if err != nil {
 		return NewErrorScene(ctx, game, err)
 	}
-	fontFace14, err := opentype.NewFace(tt, &opentype.FaceOptions{
+	stampatelloFaceto14, err := opentype.NewFace(stampatelloFaceto, &opentype.FaceOptions{
 		Size:    float64(14),
 		DPI:     96,
 		Hinting: font.HintingFull,
 	})
 	if err != nil {
 		return NewErrorScene(ctx, game, err)
+	}
+	cascadiaMono, err := opentype.Parse(assets.CascadiaMonoTTF)
+	if err != nil {
+		return NewErrorScene(ctx, game, err)
+	}
+	cascadiaMono14, err := opentype.NewFace(cascadiaMono, &opentype.FaceOptions{
+		Size:    float64(16),
+		DPI:     96,
+		Hinting: font.HintingFull,
+	})
+	if err != nil {
+		return NewErrorScene(ctx, game, err)
+	}
+
+	expenses := []*Expense{
+		{
+			Expense:     "salary hack",
+			Cost:        func() decimal.Decimal { return decimal.Zero },
+			ScheduledAt: time.Date(gameStartDate().Year(), gameStartDate().Month()+1, 1, 12, 0, 0, 0, gameStartDate().Location()).AddDate(0, 0, -1),
+			AddMonth:    1,
+		},
+		{
+			Expense: "for groceries",
+			Cost: func() decimal.Decimal {
+				return decimal.NewFromFloat(200 + float64(rand.IntN(10000))/100)
+			},
+			ScheduledAt: gameStartDate().Add(time.Hour * 24 * 7),
+			AddDays:     7,
+			AddDuration: func() time.Duration { return randDuration(-time.Hour*3, time.Hour*3) },
+		},
+	}
+	if !options.DecreaseDifficulty {
+		expenses = append(expenses, &Expense{
+			Expense:     "for rent",
+			Cost:        func() decimal.Decimal { return decimal.NewFromFloat(700) },
+			ScheduledAt: time.Date(gameStartDate().Year(), gameStartDate().Month()+1, 1, 12, 0, 0, 0, gameStartDate().Location()),
+			AddMonth:    1,
+		})
 	}
 
 	now := time.Now()
@@ -192,8 +237,10 @@ func NewBattlefieldScene(ctx context.Context, game entity.Game, questions entity
 		game:       game,
 		questions:  questions,
 		firstNames: firstNames,
-		fontFace10: fontFace10,
-		fontFace14: fontFace14,
+
+		stampatelloFaceto10: stampatelloFaceto10,
+		stampatelloFaceto14: stampatelloFaceto14,
+		cascadiaMono14:      cascadiaMono14,
 
 		gameStart:            now,
 		nextTokenSpawn:       now,
@@ -205,29 +252,9 @@ func NewBattlefieldScene(ctx context.Context, game entity.Game, questions entity
 		tokens:     make([]entity.Token, 0),
 
 		messages: make([]Message, 0),
-		expenses: []*Expense{
-			{
-				Expense:     "salary hack",
-				Cost:        func() decimal.Decimal { return decimal.Zero },
-				ScheduledAt: time.Date(gameStartDate().Year(), gameStartDate().Month()+1, 1, 12, 0, 0, 0, gameStartDate().Location()).AddDate(0, 0, -1),
-				AddMonth:    1,
-			},
-			{
-				Expense:     "for rent",
-				Cost:        func() decimal.Decimal { return decimal.NewFromFloat(700) },
-				ScheduledAt: time.Date(gameStartDate().Year(), gameStartDate().Month()+1, 1, 12, 0, 0, 0, gameStartDate().Location()),
-				AddMonth:    1,
-			},
-			{
-				Expense: "for groceries",
-				Cost: func() decimal.Decimal {
-					return decimal.NewFromFloat(200 + float64(rand.IntN(10000))/100)
-				},
-				ScheduledAt: gameStartDate().Add(time.Hour * 24 * 7),
-				AddDays:     7,
-				AddDuration: func() time.Duration { return randDuration(-time.Hour*3, time.Hour*3) },
-			},
-		},
+		expenses: expenses,
+
+		options: options,
 	}
 }
 
@@ -243,7 +270,7 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 		if win {
 			_type = typeGameOverWin
 		}
-		return NewGameOverScene(s.ctx, _type, s.game, s.fontFace10, s.questions, s.firstNames, s.stats), nil
+		return NewGameOverScene(s.ctx, _type, s.game, s.stampatelloFaceto10, s.questions, s.firstNames, s.stats), nil
 	}
 	for c, deleted := range s.characters.DeleteFunc(func(c entity.Character) bool {
 		return time.Since(c.Deadline()) > 0
@@ -283,9 +310,11 @@ idleFor:
 			s.stats.OffersReceived++
 			duration := randDuration(interviewerLifetimeFrom, interviewerLifetimeTo)
 			recruiter.UpdateDeadline(duration)
-			engineer.UpdateDeadline(duration)
+			if s.options.TechInterview {
+				engineer.UpdateDeadline(duration)
+			}
 			founder.UpdateDeadline(duration)
-		} else if engineer != nil && character.FilterIdle(engineer) {
+		} else if engineer != nil && character.FilterIdle(engineer) && s.options.TechInterview {
 			if engineer.GetQuestion() == nil {
 				if engineer.PlayerPoints() > 0 {
 					engineer.SetInterviewResult(character.NewRoundPassed())
@@ -320,10 +349,21 @@ idleFor:
 				}
 			}
 			duration := randDuration(interviewerLifetimeFrom, interviewerLifetimeTo)
-			questions, answers := s.questions.Engineer.GetRandomQuestions(5)
+			var (
+				nextRole  entity.CharacterRole
+				questions []entity.Question
+				answers   entity.AnswersGrouped
+			)
+			if !s.options.TechInterview {
+				nextRole = entity.CharacterRoleFounder
+				questions, answers = s.questions.Recruiter.GetRandomQuestions(numFounderQuestions) // TODO
+			} else {
+				nextRole = entity.CharacterRoleEngineer
+				questions, answers = s.questions.Engineer.GetRandomQuestions(numEngineerQuestions)
+			}
 			s.queueAnswers = append(getSomeAnswers(answers, spawnX, spawnY), s.queueAnswers...)
 			newChar, err := character.NewCharacter(s.firstNames.GetRandomMaleFirstName(),
-				entity.CharacterRoleEngineer,
+				nextRole,
 				spawnX, spawnY,
 				questions,
 				duration,
@@ -353,7 +393,7 @@ idleFor:
 			a, s.queueAnswers = s.queueAnswers[i], s.queueAnswers[:i]
 			spawnAngle := rand.Float64() * 2 * math.Pi
 			spawnR := 200 + rand.Float64()*(1000-200)
-			t := token.NewToken(s.fontFace14, a.answer,
+			t := token.NewToken(s.stampatelloFaceto14, a.answer,
 				a.x+spawnR*math.Cos(spawnAngle),
 				a.y+spawnR*math.Sin(spawnAngle),
 				randDuration(tokenLifetimeFrom, tokenLifetimeTo),
@@ -362,19 +402,22 @@ idleFor:
 		}
 		rnd := []entity.QuestionsDatabase{
 			s.questions.Recruiter,
-			s.questions.Engineer, // TODO
 		}
+		if s.options.TechInterview {
+			rnd = append(rnd, s.questions.Engineer)
+		}
+		// TODO добавить ещё ответы овнера
 		rand.Shuffle(len(rnd), func(i, j int) {
 			rnd[i], rnd[j] = rnd[j], rnd[i]
 		})
 		for _, q := range rnd {
 			for _, a := range q.GetRandomAnswers(tokensToSpawn / 2) {
 				spawnAngle := rand.Float64() * 2 * math.Pi
-				spawnR := 400 + rand.Float64()*(1000-400)
-				t := token.NewToken(s.fontFace14, a,
+				spawnR := 200 + rand.Float64()*(1000-200)
+				t := token.NewToken(s.stampatelloFaceto14, a,
 					s.player.X()+spawnR*math.Cos(spawnAngle),
 					s.player.Y()+spawnR*math.Sin(spawnAngle),
-					randDuration(time.Second*10, time.Second*20),
+					randDuration(time.Second*20, time.Second*30),
 				)
 				s.tokens = append(s.tokens, t)
 			}
@@ -392,7 +435,7 @@ idleFor:
 		)
 		for range interviewersToSpawn {
 			company := s.firstNames.GetRandomCompanyName()
-			questions, answers := s.questions.Recruiter.GetRandomQuestions(4)
+			questions, answers := s.questions.Recruiter.GetRandomQuestions(numRecruiterQuestions)
 			x := float64(rand.IntN(maxSpawnDistance*2) - maxSpawnDistance)
 			y := float64(rand.IntN(maxSpawnDistance*2) - maxSpawnDistance)
 			s.queueAnswers = append(getSomeAnswers(answers, x, y), s.queueAnswers...)
@@ -592,32 +635,6 @@ idleFor:
 		}
 	}
 
-	if _, err := s.debug.Update(func(ctx *debugui.Context) error {
-		const x, y = 10, 80
-		ctx.Window("TODO", image.Rect(x, y, x+250, y+140), func(layout debugui.ContainerLayout) {
-			ctx.Text(fmt.Sprintf("FPS: %0.2f; TPS: %0.2f", ebiten.ActualFPS(), ebiten.ActualTPS()))
-			ctx.Text(fmt.Sprintf("%s", s.gameTimeNow().Format("Mon, _2 Jan 2006 15:04")))
-			ctx.Text(fmt.Sprintf("%s and salary %s/month", moneyToString(s.player.Money()), moneyToString(s.player.SalaryPerMonth())))
-			ctx.Text(fmt.Sprintf("%d/%d tokens", len(s.tokens), tokenPoolSize))
-
-			//cx, cy := ebiten.CursorPosition()
-			//ctx.Text(fmt.Sprintf("Point Pos: (%d; %d)", cx, cy))
-			//ctx.Text(fmt.Sprintf("Player Pos: (%0.2f; %0.2f)", s.player.X(), s.player.Y()))
-
-			// TODO убирать про фулскрин, после полминуты игры
-			ctx.Text("Use [Shift]+[F] for fullscreen.")
-			if s.tokensInFocus > 0 {
-				ctx.Text("Use [E] to pick up phrases.")
-			}
-			if nearestCharacter != nil {
-				ctx.Text("Use [1]-[9] to answer.")
-			}
-		})
-		return nil
-	}); err != nil {
-		return NewErrorScene(s.ctx, s.game, err), nil
-	}
-
 	for i := len(s.messages) - 1; i >= 0; i-- {
 		if time.Since(s.messages[i].expiredTo) > 0 {
 			s.messages = append(s.messages[:i], s.messages[i+1:]...)
@@ -678,7 +695,7 @@ func (s *battlefieldScene) Draw(screen *ebiten.Image) {
 			if q := c.GetQuestion(); q != nil {
 				tipX := c.TopLeftX() + c.Width()/2 - s.camera.X
 				tipY := c.TopLeftY() - s.camera.Y
-				drawSpeechBubble(screen, s.fontFace10, s.fontFace14, titleOfCharacter(c), q.Question(), tipX, tipY)
+				drawSpeechBubble(screen, s.stampatelloFaceto10, s.stampatelloFaceto14, titleOfCharacter(c), q.Question(), tipX, tipY)
 			} else if result := c.InterviewResult(); result != nil {
 				tipX := c.TopLeftX() + c.Width()/2 - s.camera.X
 				tipY := c.TopLeftY() - s.camera.Y
@@ -692,7 +709,7 @@ func (s *battlefieldScene) Draw(screen *ebiten.Image) {
 					msg = "..."
 				}
 				if len(msg) > 0 {
-					drawSpeechBubble(screen, s.fontFace10, s.fontFace14, titleOfCharacter(c), msg, tipX, tipY)
+					drawSpeechBubble(screen, s.stampatelloFaceto10, s.stampatelloFaceto14, titleOfCharacter(c), msg, tipX, tipY)
 				}
 			}
 		}
@@ -711,10 +728,31 @@ func (s *battlefieldScene) Draw(screen *ebiten.Image) {
 		}
 	}
 
-	drawInventory(screen, s.fontFace10, s.inventory[:], winW, winH)
+	drawInventory(screen, s.stampatelloFaceto10, s.inventory[:], winW, winH)
+
+	timeStr := s.gameTimeNow().Format("Mon,_2 Jan 2006 15:04")
+	timeBounds := text.BoundString(s.cascadiaMono14, timeStr)
+	timeOp := &ebiten.DrawImageOptions{}
+	timeOp.GeoM.Translate(float64(winW)-15-float64(timeBounds.Dx())-float64(timeBounds.Min.X), 15-float64(timeBounds.Min.Y))
+	timeOp.ColorM.ScaleWithColor(color.NRGBA{R: 200, G: 210, B: 255, A: 220})
+	text.DrawWithOptions(screen, timeStr, s.cascadiaMono14, timeOp)
+
+	moneyStr := moneyToString(s.player.Money())
+	moneyBounds := text.BoundString(s.cascadiaMono14, moneyStr)
+	moneyOp := &ebiten.DrawImageOptions{}
+	moneyOp.GeoM.Translate(float64(winW)-15-float64(moneyBounds.Dx())-float64(moneyBounds.Min.X), 15*2+float64(timeBounds.Dy())-float64(moneyBounds.Min.Y))
+	moneyOp.ColorM.ScaleWithColor(color.NRGBA{R: 200, G: 210, B: 255, A: 220})
+	text.DrawWithOptions(screen, moneyStr, s.cascadiaMono14, moneyOp)
+
+	salaryStr := moneyToString(s.player.SalaryPerMonth()) + "/month"
+	salaryBounds := text.BoundString(s.cascadiaMono14, salaryStr)
+	salaryOp := &ebiten.DrawImageOptions{}
+	salaryOp.GeoM.Translate(float64(winW)-15-float64(salaryBounds.Dx())-float64(salaryBounds.Min.X), 15*3+float64(timeBounds.Dy())+float64(moneyBounds.Dy())-float64(salaryBounds.Min.Y))
+	salaryOp.ColorM.ScaleWithColor(color.NRGBA{R: 200, G: 210, B: 255, A: 220})
+	text.DrawWithOptions(screen, salaryStr, s.cascadiaMono14, salaryOp)
 
 	const hotbarH = 80 + 10 // barH + sideMargin
-	drawToasts(screen, s.fontFace10, s.messages, float64(winW), float64(winH)-hotbarH)
+	drawToasts(screen, s.stampatelloFaceto10, s.messages, float64(winW), float64(winH)-hotbarH)
 
 	s.debug.Draw(screen)
 }

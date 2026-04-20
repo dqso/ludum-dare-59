@@ -40,4 +40,7 @@ var (
 
 	//go:embed StampatelloFacetoKern.ttf
 	StampatelloFacetoKernTTF []byte
+
+	//go:embed CascadiaMono.ttf
+	CascadiaMonoTTF []byte
 )

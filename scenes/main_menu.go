@@ -32,11 +32,12 @@ type mainMenuScene struct {
 
 	options entity.GameOptions
 
-	screen           mainMenuScreen
-	mainUI           *ebitenui.UI
-	optionsUI        *ebitenui.UI
-	helpUI           *ebitenui.UI
-	techInterviewBtn *widget.Button
+	screen                mainMenuScreen
+	mainUI                *ebitenui.UI
+	optionsUI             *ebitenui.UI
+	helpUI                *ebitenui.UI
+	techInterviewBtn      *widget.Button
+	decreaseDifficultyBtn *widget.Button
 
 	next entity.Scene
 	quit bool
@@ -48,6 +49,10 @@ func NewMainMenuScene(ctx context.Context, game entity.Game, questions entity.Qu
 		game:       game,
 		questions:  questions,
 		firstNames: firstNames,
+		options: entity.GameOptions{
+			TechInterview:      true,
+			DecreaseDifficulty: true,
+		},
 	}
 
 	fontSrc, err := text.NewGoTextFaceSource(bytes.NewReader(assets.StampatelloFacetoKernTTF))
@@ -150,6 +155,21 @@ func NewMainMenuScene(ctx context.Context, game entity.Game, questions entity.Qu
 		s.options.TechInterview = !s.options.TechInterview
 	})
 	optC.AddChild(s.techInterviewBtn)
+
+	s.decreaseDifficultyBtn = newButton(s.decreaseDifficultyLabel(), func() {
+		s.options.DecreaseDifficulty = !s.options.DecreaseDifficulty
+	})
+	optC.AddChild(s.decreaseDifficultyBtn)
+
+	optC.AddChild(widget.NewText(
+		widget.TextOpts.Text("Removes other difficulties, e.g. no need to pay rent", &faceSmall, color.NRGBA{R: 180, G: 180, B: 180, A: 200}),
+		widget.TextOpts.WidgetOpts(
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+				Position: widget.RowLayoutPositionCenter,
+			}),
+		),
+	))
+
 	optC.AddChild(newButton("Back", func() {
 		s.screen = mainMenuScreenMain
 	}))
@@ -217,7 +237,15 @@ func (s *mainMenuScene) techInterviewLabel() string {
 	if s.options.TechInterview {
 		state = "on"
 	}
-	return fmt.Sprintf("Tech Interview  [%s]", state)
+	return fmt.Sprintf("Tech Interview [%s]", state)
+}
+
+func (s *mainMenuScene) decreaseDifficultyLabel() string {
+	state := "off"
+	if s.options.DecreaseDifficulty {
+		state = "on"
+	}
+	return fmt.Sprintf("Decrease Difficulty [%s]", state)
 }
 
 func (s *mainMenuScene) Update() (entity.Scene, error) {
@@ -242,6 +270,7 @@ func (s *mainMenuScene) Update() (entity.Scene, error) {
 			s.screen = mainMenuScreenMain
 		}
 		s.techInterviewBtn.Text().Label = s.techInterviewLabel()
+		s.decreaseDifficultyBtn.Text().Label = s.decreaseDifficultyLabel()
 		s.optionsUI.Update()
 
 	case mainMenuScreenHelp:

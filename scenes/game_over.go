@@ -205,7 +205,7 @@ func (s *gameOverScene) Draw(screen *ebiten.Image) {
 
 	// Frosted glass panel behind the stats container.
 	r := s.centerContainer.GetWidget().Rect
-	if !r.Empty() {
+	if !r.Empty() && s._type != typeGameOverLose {
 		panelX, panelY := float64(r.Min.X), float64(r.Min.Y)
 		panelW, panelH := float64(r.Dx()), float64(r.Dy())
 		// Blurred bg: scale bgBlurred (1/8 of original) to match the panel area.
