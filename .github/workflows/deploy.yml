@@ -21,7 +21,13 @@ jobs:
         run: go build -o docs/main.wasm ./
 
       - name: Copy wasm_exec.js
-        run: cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" docs/wasm_exec.js
+        run: |
+          GOROOT=$(go env GOROOT)
+          if [ -f "$GOROOT/lib/wasm/wasm_exec.js" ]; then
+            cp "$GOROOT/lib/wasm/wasm_exec.js" docs/wasm_exec.js
+          else
+            cp "$GOROOT/misc/wasm/wasm_exec.js" docs/wasm_exec.js
+          fi
 
       - uses: peaceiris/actions-gh-pages@v4
         with:
