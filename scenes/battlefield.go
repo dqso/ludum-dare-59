@@ -241,7 +241,7 @@ func NewBattlefieldScene(ctx context.Context, game entity.Game, questions entity
 		})
 	}
 
-	musicTracks := [][]byte{assets.Music1MP3, assets.Music2MP3, assets.Music3MP3}
+	musicTracks := entity.GetMusicPlaylist()
 	rand.Shuffle(len(musicTracks), func(i, j int) {
 		musicTracks[i], musicTracks[j] = musicTracks[j], musicTracks[i]
 	})
@@ -538,6 +538,11 @@ idleFor:
 		btnX, btn1Y, btn2Y := escMenuButtonPositions(winW, winH)
 		switch {
 		case escMenuInRect(mx, my, btnX, btn1Y):
+			s.musicPlayer.Pause()
+			if err := s.musicPlayer.Close(); err != nil {
+				log.Printf("failed to close music player: %v", err)
+			}
+			s.musicPlayer = nil
 			return NewMainMenuScene(s.ctx, s.game, s.questions, s.firstNames), nil
 		case escMenuInRect(mx, my, btnX, btn2Y):
 			s.escMenuOpen = false

@@ -5,6 +5,9 @@ import (
 	"context"
 	"fmt"
 	"image/color"
+	"log"
+	"math/rand/v2"
+	"time"
 
 	"github.com/dqso/ludum-dare-59/assets"
 	"github.com/dqso/ludum-dare-59/entity"
@@ -12,6 +15,8 @@ import (
 	euiimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/audio"
+	"github.com/hajimehoshi/ebiten/v2/audio/mp3"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
 )
@@ -40,6 +45,10 @@ type mainMenuScene struct {
 	decreaseDifficultyBtn *widget.Button
 	musicVolumeBtn        *widget.Button
 	showFPSBtn            *widget.Button
+
+	previewPlayer   *audio.Player
+	previewTrackIdx int
+	previewStopAt   time.Time
 
 	next entity.Scene
 	quit bool
@@ -178,10 +187,12 @@ func NewMainMenuScene(ctx context.Context, game entity.Game, questions entity.Qu
 		for i, v := range levels {
 			if v == s.options.MusicVolume {
 				s.options.MusicVolume = levels[(i+1)%len(levels)]
+				s.startMusicPreview()
 				return
 			}
 		}
 		s.options.MusicVolume = levels[1]
+		s.startMusicPreview()
 	})
 	optC.AddChild(s.musicVolumeBtn)
 
@@ -249,6 +260,8 @@ func NewMainMenuScene(ctx context.Context, game entity.Game, questions entity.Qu
 
 	s.helpUI = &ebitenui.UI{Container: makeRoot(helpC)}
 
+	s.previewTrackIdx = rand.IntN(len(entity.GetMusicPlaylist()))
+
 	return s
 }
 
@@ -292,7 +305,16 @@ func (s *mainMenuScene) Update() (entity.Scene, error) {
 		return nil, ebiten.Termination
 	}
 	if s.next != nil {
+		s.previewPlayer.Pause()
+		if err := s.previewPlayer.Close(); err != nil {
+			log.Printf("failed to close preview player: %v", err)
+		}
+		s.previewPlayer = nil
 		return s.next, nil
+	}
+
+	if s.previewPlayer != nil && s.previewPlayer.IsPlaying() && time.Now().After(s.previewStopAt) {
+		s.previewPlayer.Pause()
 	}
 
 	escPressed := inpututil.IsKeyJustPressed(ebiten.KeyEscape)
@@ -338,3 +360,32 @@ func (s *mainMenuScene) Draw(screen *ebiten.Image) {
 }
 
 func (s *mainMenuScene) Name() string { return "Main Menu" }
+
+func (s *mainMenuScene) startMusicPreview() {
+	if s.previewPlayer != nil {
+		s.previewPlayer.Pause()
+		s.previewPlayer.Close()
+		s.previewPlayer = nil
+	}
+	if s.options.MusicVolume == 0 {
+		return
+	}
+	track := entity.GetMusicPlaylist()[s.previewTrackIdx]
+	decoded, err := mp3.DecodeWithSampleRate(globalAudioContext.SampleRate(), bytes.NewReader(track))
+	if err != nil {
+		return
+	}
+	p, err := globalAudioContext.NewPlayer(decoded)
+	if err != nil {
+		return
+	}
+	p.SetVolume(s.options.MusicVolume)
+	bytesPerSec := int64(globalAudioContext.SampleRate()) * 4 // stereo int16
+	midDur := time.Duration(decoded.Length()/2) * time.Second / time.Duration(bytesPerSec)
+	if err := p.Seek(midDur); err != nil {
+		return
+	}
+	p.Play()
+	s.previewPlayer = p
+	s.previewStopAt = time.Now().Add(5 * time.Second)
+}
