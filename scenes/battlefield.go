@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"image"
 	"image/color"
 	"log"
 	"maps"
@@ -69,6 +70,10 @@ type battlefieldScene struct {
 	musicTracks  [][]byte
 	currentTrack int
 	musicPlayer  *audio.Player
+
+	bgImage   *ebiten.Image
+	bgCameraX float64
+	bgCameraY float64
 }
 
 type AnswerWithPoint struct {
@@ -721,11 +726,23 @@ idleFor:
 		}
 	}
 
+	if _, err := s.debug.Update(func(ctx *debugui.Context) error {
+		const x, y = 10, 80
+		ctx.Window("TODO", image.Rect(x, y, x+250, y+140), func(layout debugui.ContainerLayout) {
+			ctx.Text(fmt.Sprintf("FPS: %0.2f; TPS: %0.2f", ebiten.ActualFPS(), ebiten.ActualTPS()))
+		})
+		return nil
+	}); err != nil {
+		return NewErrorScene(s.ctx, s.game, err), nil
+	}
+
 	return nil, nil
 }
 
 func (s *battlefieldScene) Draw(screen *ebiten.Image) {
+	//if s.bgCameraX != s.camera.X && s.bgCameraY != s.camera.Y {
 	drawBackground(screen, s.camera.X, s.camera.Y)
+	//}
 	winW, winH := s.game.WindowSize()
 
 	for _, t := range s.tokens {
