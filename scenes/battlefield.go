@@ -306,7 +306,7 @@ idleFor:
 					break idleFor
 				}
 			}
-			recruiter.SetInterviewResult(character.NewOffer(decimal.NewFromFloat(123)))
+			recruiter.SetInterviewResult(character.NewOffer(decimal.NewFromFloat(float64(2000 + rand.IntN(5)*100))))
 			s.stats.OffersReceived++
 			duration := randDuration(interviewerLifetimeFrom, interviewerLifetimeTo)
 			recruiter.UpdateDeadline(duration)
