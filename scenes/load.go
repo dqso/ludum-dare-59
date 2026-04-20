@@ -1,6 +1,7 @@
 package scenes
 
 import (
+	"context"
 	"time"
 
 	"github.com/dqso/ludum-dare-59/assets"
@@ -10,6 +11,7 @@ import (
 )
 
 type loadScene struct {
+	ctx  context.Context
 	game entity.Game
 
 	status       uint8
@@ -18,8 +20,9 @@ type loadScene struct {
 	questions entity.QuestionsForInterview
 }
 
-func NewLoadScene(game entity.Game) entity.Scene {
+func NewLoadScene(ctx context.Context, game entity.Game) entity.Scene {
 	s := &loadScene{
+		ctx:    ctx,
 		game:   game,
 		status: loadStartResources,
 	}
@@ -53,13 +56,13 @@ func (s *loadScene) Update() (entity.Scene, error) {
 			if s.questions.Recruiter == nil {
 				questions, err := database.NewQuestionsDatabase(assets.QuestionsRecruiterCSV)
 				if err != nil {
-					return NewErrorScene(s.game, err), nil
+					return NewErrorScene(s.ctx, s.game, err), nil
 				}
 				s.questions.Recruiter = questions
 			} else if s.questions.Engineer == nil {
 				questions, err := database.NewQuestionsDatabase(assets.QuestionsEngineerCSV)
 				if err != nil {
-					return NewErrorScene(s.game, err), nil
+					return NewErrorScene(s.ctx, s.game, err), nil
 				}
 				s.questions.Engineer = questions
 			} else {
@@ -70,7 +73,7 @@ func (s *loadScene) Update() (entity.Scene, error) {
 	case loadEndResources:
 		// Почистить память
 
-		return NewMainMenuScene(s.game, s.questions), nil
+		return NewMainMenuScene(s.ctx, s.game, s.questions), nil
 	}
 	return nil, nil
 }

@@ -21,7 +21,7 @@ func New(ctx context.Context) entity.Game {
 		ctx: ctx,
 	}
 
-	g.scene = scenes.NewLoadScene(g)
+	g.scene = scenes.NewLoadScene(ctx, g)
 
 	return g
 }
@@ -34,12 +34,12 @@ func (g *game) Update() error {
 	}
 
 	if g.scene == nil {
-		g.scene = scenes.NewErrorScene(g, fmt.Errorf("scene is nil"))
+		g.scene = scenes.NewErrorScene(g.ctx, g, fmt.Errorf("scene is nil"))
 		return nil
 	}
 	newScene, err := g.scene.Update()
 	if err != nil {
-		g.scene = scenes.NewErrorScene(g, err)
+		g.scene = scenes.NewErrorScene(g.ctx, g, err)
 		return nil
 	} else {
 		if newScene != nil {

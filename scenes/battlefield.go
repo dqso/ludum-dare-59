@@ -1,6 +1,7 @@
 package scenes
 
 import (
+	"context"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -29,6 +30,7 @@ import (
 )
 
 type battlefieldScene struct {
+	ctx        context.Context
 	game       entity.Game
 	questions  entity.QuestionsForInterview
 	fontFace10 font.Face
@@ -50,6 +52,8 @@ type battlefieldScene struct {
 
 	messages []Message
 	expenses []*Expense
+
+	stats entity.Stats
 
 	debug debugui.DebugUI
 }
@@ -130,6 +134,8 @@ const (
 	startedMoneyFrom = 2000.00
 	startedMoneyTo   = 3000.00
 	startedSalary    = 0
+	gameOverMoney    = -500.00
+	winnerMoney      = 10000.00
 
 	coeffRealTime time.Duration = 12 * 24 * 30 // 5 минут = 1 месяц
 )
@@ -146,13 +152,13 @@ func moneyToString(money decimal.Decimal) string {
 	return fmt.Sprintf("$%s", money.StringFixed(2))
 }
 
-func NewBattlefieldScene(game entity.Game, questions entity.QuestionsForInterview) entity.Scene {
+func NewBattlefieldScene(ctx context.Context, game entity.Game, questions entity.QuestionsForInterview) entity.Scene {
 	winW, winH := game.WindowSize()
 
 	startedMoney := float64(startedMoneyFrom*100+rand.Int64N((startedMoneyTo-startedMoneyFrom)*100)) / 100
 	player, err := player.NewPlayer(0, 0, decimal.NewFromFloat(startedMoney), decimal.NewFromFloat(startedSalary))
 	if err != nil {
-		return NewErrorScene(game, err)
+		return NewErrorScene(ctx, game, err)
 	}
 	camera := Camera{
 		X: player.X() - float64(winW)/2,
@@ -161,7 +167,7 @@ func NewBattlefieldScene(game entity.Game, questions entity.QuestionsForIntervie
 
 	tt, err := opentype.Parse(assets.StampatelloFacetoKernTTF)
 	if err != nil {
-		return NewErrorScene(game, err)
+		return NewErrorScene(ctx, game, err)
 	}
 	fontFace10, err := opentype.NewFace(tt, &opentype.FaceOptions{
 		Size:    float64(10),
@@ -169,7 +175,7 @@ func NewBattlefieldScene(game entity.Game, questions entity.QuestionsForIntervie
 		Hinting: font.HintingFull,
 	})
 	if err != nil {
-		return NewErrorScene(game, err)
+		return NewErrorScene(ctx, game, err)
 	}
 	fontFace14, err := opentype.NewFace(tt, &opentype.FaceOptions{
 		Size:    float64(14),
@@ -177,11 +183,12 @@ func NewBattlefieldScene(game entity.Game, questions entity.QuestionsForIntervie
 		Hinting: font.HintingFull,
 	})
 	if err != nil {
-		return NewErrorScene(game, err)
+		return NewErrorScene(ctx, game, err)
 	}
 
 	now := time.Now()
 	return &battlefieldScene{
+		ctx:        ctx,
 		game:       game,
 		questions:  questions,
 		fontFace10: fontFace10,
@@ -224,6 +231,13 @@ func NewBattlefieldScene(game entity.Game, questions entity.QuestionsForIntervie
 }
 
 func (s *battlefieldScene) Update() (entity.Scene, error) {
+	if s.player.Money().LessThan(decimal.NewFromFloat(gameOverMoney)) || ebiten.IsKeyPressed(ebiten.KeyQ) {
+		s.stats.DurationInGame = s.gameTimeNow().Sub(gameStartDate())
+		s.stats.RealTimePlayed = time.Since(s.gameStart)
+		s.stats.CurrentBalance = s.player.Money()
+		s.stats.MonthlySalary = s.player.SalaryPerMonth()
+		return NewGameOverScene(s.ctx, s.game, s.fontFace10, s.questions, s.stats), nil
+	}
 	for c, deleted := range s.characters.DeleteFunc(func(c entity.Character) bool {
 		return time.Since(c.Deadline()) > 0
 	}) {
@@ -259,6 +273,11 @@ idleFor:
 				}
 			}
 			recruiter.SetInterviewResult(character.NewOffer(decimal.NewFromFloat(123)))
+			s.stats.OffersReceived++
+			duration := randDuration(interviewerLifetimeFrom, interviewerLifetimeTo)
+			recruiter.UpdateDeadline(duration)
+			engineer.UpdateDeadline(duration)
+			founder.UpdateDeadline(duration)
 		} else if engineer != nil && character.FilterIdle(engineer) {
 			if engineer.GetQuestion() == nil {
 				if engineer.PlayerPoints() > 0 {
@@ -279,9 +298,10 @@ idleFor:
 				c.Company(),
 			)
 			if err != nil {
-				return NewErrorScene(s.game, err), nil
+				return NewErrorScene(s.ctx, s.game, err), nil
 			}
 			s.characters.Add(newChar)
+			recruiter.UpdateDeadline(duration)
 			engineer.UpdateDeadline(duration)
 		} else if recruiter != nil && character.FilterIdle(recruiter) {
 			if recruiter.GetQuestion() == nil {
@@ -303,7 +323,7 @@ idleFor:
 				c.Company(),
 			)
 			if err != nil {
-				return NewErrorScene(s.game, err), nil
+				return NewErrorScene(s.ctx, s.game, err), nil
 			}
 			s.characters.Add(newChar)
 			recruiter.UpdateDeadline(duration)
@@ -376,7 +396,7 @@ idleFor:
 				company,
 			)
 			if err != nil {
-				return NewErrorScene(s.game, err), nil
+				return NewErrorScene(s.ctx, s.game, err), nil
 			}
 			s.characters.Add(c)
 			s.messages = append(s.messages, Message{
@@ -484,6 +504,7 @@ idleFor:
 			if nearestCharacter != nil && nearestCharacter.GetQuestion() != nil {
 				answer := t.Answer()
 				nearestCharacter.AnswerTheQuestion(s.questions.Choose(nearestCharacter), answer)
+				s.stats.QuestionsAnswered++
 			} else if nearestCharacter != nil && (nearestCharacter.InterviewResult() != nil && nearestCharacter.InterviewResult().Outcome() == entity.OutcomeOffer) {
 				answer := t.Answer()
 				switch answer.Category() {
@@ -495,12 +516,14 @@ idleFor:
 						log.Printf("Character %s from company %q has been removed.", c.Role(), c.Company())
 					}
 					s.player.AddSalaryPerMonth(salary)
+					s.stats.OffersAccepted++
 				case entity.AnswerCategoryBinaryNo:
 					for c := range s.characters.DeleteFunc(func(c entity.Character) bool {
 						return c.Company() == nearestCharacter.Company()
 					}) {
 						log.Printf("Character %s from company %q has been removed.", c.Role(), c.Company())
 					}
+					s.stats.OffersRejected++
 				default:
 					s.tokens = append(s.tokens, t)
 				}
@@ -574,7 +597,7 @@ idleFor:
 		})
 		return nil
 	}); err != nil {
-		return NewErrorScene(s.game, err), nil
+		return NewErrorScene(s.ctx, s.game, err), nil
 	}
 
 	for i := len(s.messages) - 1; i >= 0; i-- {
@@ -598,10 +621,12 @@ idleFor:
 				}
 				msg = fmt.Sprintf("You earned %s this month.", moneyToString(salary))
 				s.player.AddMoney(salary)
+				s.stats.Earned.Add(salary)
 			} else {
 				cost := e.Cost()
 				msg = fmt.Sprintf("You paid %s %s.", moneyToString(cost), e.Expense)
 				s.player.AddMoney(cost.Neg())
+				s.stats.Spent.Add(cost)
 			}
 
 			if len(msg) > 0 {
@@ -642,7 +667,7 @@ func (s *battlefieldScene) Draw(screen *ebiten.Image) {
 				var msg string
 				switch result.Outcome() {
 				case entity.OutcomeOffer:
-					msg = fmt.Sprintf("We are hiring you.\nYour salary will be $%d.\nDo you accept?", result.Salary())
+					msg = fmt.Sprintf("We are hiring you.\nYour salary will be %s.\nDo you accept?", moneyToString(result.Salary()))
 				case entity.OutcomeRoundPassed:
 					msg = "Great job!\nYou've passed this round."
 				case entity.OutcomeRejection:

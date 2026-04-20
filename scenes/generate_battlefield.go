@@ -1,6 +1,7 @@
 package scenes
 
 import (
+	"context"
 	"time"
 
 	"github.com/dqso/ludum-dare-59/entity"
@@ -8,6 +9,7 @@ import (
 )
 
 type generateBattlefieldScene struct {
+	ctx  context.Context
 	game entity.Game
 
 	status       uint8
@@ -16,8 +18,9 @@ type generateBattlefieldScene struct {
 	questions entity.QuestionsForInterview
 }
 
-func NewGenerateBattlefieldScene(game entity.Game, questions entity.QuestionsForInterview) entity.Scene {
+func NewGenerateBattlefieldScene(ctx context.Context, game entity.Game, questions entity.QuestionsForInterview) entity.Scene {
 	s := &generateBattlefieldScene{
+		ctx:       ctx,
 		game:      game,
 		questions: questions,
 		status:    generateBattlefieldStartResources,
@@ -55,7 +58,7 @@ func (s *generateBattlefieldScene) Update() (entity.Scene, error) {
 	case generateBattlefieldEndResources:
 		// Почистить память
 
-		return NewBattlefieldScene(s.game, s.questions), nil
+		return NewBattlefieldScene(s.ctx, s.game, s.questions), nil
 	}
 	return nil, nil
 }

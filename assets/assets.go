@@ -5,6 +5,9 @@ import (
 )
 
 var (
+	//go:embed GameOver.png
+	GameOverPNG []byte
+
 	//go:embed recruiter.csv
 	QuestionsRecruiterCSV []byte
 

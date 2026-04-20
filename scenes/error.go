@@ -1,6 +1,7 @@
 package scenes
 
 import (
+	"context"
 	"log"
 
 	"github.com/dqso/ludum-dare-59/entity"
@@ -9,13 +10,15 @@ import (
 )
 
 type errorScene struct {
+	ctx  context.Context
 	game entity.Game
 	err  error
 }
 
-func NewErrorScene(game entity.Game, err error) entity.Scene {
+func NewErrorScene(ctx context.Context, game entity.Game, err error) entity.Scene {
 	log.Printf("created error scene with error: %v", err)
 	return &errorScene{
+		ctx:  ctx,
 		game: game,
 		err:  err,
 	}
