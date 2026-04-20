@@ -15,19 +15,23 @@ import (
 const targetH float64 = 45.0
 
 type Character struct {
-	x, y           float64
-	w, h           float64
-	pivotX, pivotY float64
-	speed          float64
-	sprite         *ebiten.Image
-	role           entity.CharacterRole
-	focused        bool
-	questions      []entity.Question
-	pointsToPlayer int
-	deadline       time.Time
+	x, y            float64
+	w, h            float64
+	pivotX, pivotY  float64
+	speed           float64
+	sprite          *ebiten.Image
+	role            entity.CharacterRole
+	focused         bool
+	questions       []entity.Question
+	playerPoints    int
+	deadline        time.Time
+	company         string
+	prev            entity.Character
+	next            entity.Character
+	interviewResult entity.InterviewResult
 }
 
-func NewCharacter(role entity.CharacterRole, x, y float64, questions []entity.Question, lifetime time.Duration) (*Character, error) {
+func NewCharacter(role entity.CharacterRole, x, y float64, questions []entity.Question, lifetime time.Duration, company string) (*Character, error) {
 	var asset []byte
 	switch role {
 	case entity.CharacterRoleRecruiter:
@@ -68,6 +72,7 @@ func NewCharacter(role entity.CharacterRole, x, y float64, questions []entity.Qu
 		role:      role,
 		questions: questions,
 		deadline:  time.Now().Add(lifetime),
+		company:   company,
 	}
 	c.Move(x, y)
 
@@ -78,19 +83,25 @@ func (c Character) Role() entity.CharacterRole {
 	return c.role
 }
 
-func (c Character) X() float64           { return c.x }
-func (c Character) Y() float64           { return c.y }
-func (c Character) TopLeftX() float64    { return c.x - c.w/2 }
-func (c Character) TopLeftY() float64    { return c.y - c.h/2 }
-func (c Character) Speed() float64       { return c.speed }
-func (c Character) PivotX() float64      { return c.pivotX }
-func (c Character) PivotY() float64      { return c.pivotY }
-func (c Character) PivotRadius() float64 { return c.w / 2 }
-func (c Character) Width() float64       { return c.w }
-func (c Character) Height() float64      { return c.h }
-func (c *Character) SetFocus(focus bool) { c.focused = focus }
-func (c Character) IsFocused() bool      { return c.focused }
-func (c Character) Deadline() time.Time  { return c.deadline }
+func (c Character) X() float64                                        { return c.x }
+func (c Character) Y() float64                                        { return c.y }
+func (c Character) TopLeftX() float64                                 { return c.x - c.w/2 }
+func (c Character) TopLeftY() float64                                 { return c.y - c.h/2 }
+func (c Character) Speed() float64                                    { return c.speed }
+func (c Character) PivotX() float64                                   { return c.pivotX }
+func (c Character) PivotY() float64                                   { return c.pivotY }
+func (c Character) PivotRadius() float64                              { return c.w / 2 }
+func (c Character) Width() float64                                    { return c.w }
+func (c Character) Height() float64                                   { return c.h }
+func (c *Character) SetFocus(focus bool)                              { c.focused = focus }
+func (c Character) IsFocused() bool                                   { return c.focused }
+func (c Character) Deadline() time.Time                               { return c.deadline }
+func (c Character) Company() string                                   { return c.company }
+func (c *Character) SetCompany(company string)                        { c.company = company }
+func (c Character) InterviewResult() entity.InterviewResult           { return c.interviewResult }
+func (c *Character) SetInterviewResult(result entity.InterviewResult) { c.interviewResult = result }
+func (c Character) PlayerPoints() int                                 { return c.playerPoints }
+func (c *Character) SetPlayerPoints(playerPoints int)                 { c.playerPoints = playerPoints }
 
 func (c *Character) Move(dx, dy float64) {
 	c.x += dx
@@ -119,7 +130,7 @@ func (c *Character) AnswerTheQuestion(questionsDatabase entity.QuestionsDatabase
 		return
 	}
 
-	c.pointsToPlayer += points
+	c.playerPoints += points
 
 	logAboutPoints := "earned nothing"
 	if points > 0 {

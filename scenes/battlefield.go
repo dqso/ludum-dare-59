@@ -1,9 +1,12 @@
 package scenes
 
 import (
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"image"
 	"image/color"
+	"log"
 	"math"
 	"math/rand/v2"
 	"strconv"
@@ -34,13 +37,12 @@ type battlefieldScene struct {
 
 	player     entity.Player
 	camera     Camera
-	characters []entity.Character
+	characters entity.CharacterList
 	tokens     []entity.Token
 	inventory  [9]entity.CollectedToken
 
-	nearestCharacterIdx int
-	tokensInFocus       int
-	offscreenSignals    []offscreenSignal
+	tokensInFocus    int
+	offscreenSignals []offscreenSignal
 
 	debug debugui.DebugUI
 }
@@ -85,8 +87,8 @@ const (
 	maxSpawnDistance = 500.0
 
 	tokenPoolSize           = 20
-	tokenSpawnBatchSizeFrom = 2
-	tokenSpawnBatchSizeTo   = 5
+	tokenSpawnBatchSizeFrom = 12
+	tokenSpawnBatchSizeTo   = 15
 	tokenSpawnDelayFrom     = time.Second * 20
 	tokenSpawnDelayTo       = time.Second * 30
 	tokenLifetimeFrom       = time.Second * 50
@@ -137,15 +139,87 @@ func NewBattlefieldScene(game entity.Game, questions entity.QuestionsDatabase) e
 
 		player:     player,
 		camera:     camera,
-		characters: make([]entity.Character, 0),
+		characters: character.NewList(),
 		tokens:     make([]entity.Token, 0),
 	}
 }
 
 func (s *battlefieldScene) Update() (entity.Scene, error) {
-	for i := len(s.characters) - 1; i >= 0; i-- {
-		if time.Since(s.characters[i].Deadline()) > 0 {
-			s.characters = append(s.characters[:i], s.characters[i+1:]...)
+	for c, deleted := range s.characters.DeleteFunc(func(c entity.Character) bool {
+		return time.Since(c.Deadline()) > 0
+	}) {
+		if deleted {
+			log.Printf("Interviewer %s from company %q has been removed.", c.Role(), c.Company())
+		}
+	}
+idleFor:
+	for c := range s.characters.FilterFunc(character.FilterIdle) {
+		var recruiter, engineer, founder entity.Character
+		for e := range s.characters.FilterByCompany(c.Company()) {
+			switch e.Role() {
+			case entity.CharacterRoleRecruiter:
+				recruiter = e
+			case entity.CharacterRoleEngineer:
+				engineer = e
+			case entity.CharacterRoleFounder:
+				founder = e
+			default:
+				continue idleFor
+			}
+		}
+		spawnAngle := rand.Float64() * 2 * math.Pi
+		spawnDist := recruiter.Width() * (2 + rand.Float64())
+		spawnX, spawnY := recruiter.X()+math.Cos(spawnAngle)*spawnDist, recruiter.Y()+math.Sin(spawnAngle)*spawnDist
+		if founder != nil && character.FilterIdle(founder) {
+			if founder.GetQuestion() == nil {
+				if founder.PlayerPoints() > 0 {
+					founder.SetInterviewResult(character.NewRoundPassed())
+				} else {
+					founder.SetInterviewResult(character.NewRejection())
+					break idleFor
+				}
+			}
+			recruiter.SetInterviewResult(character.NewOffer(123))
+		} else if engineer != nil && character.FilterIdle(engineer) {
+			if engineer.GetQuestion() == nil {
+				if engineer.PlayerPoints() > 0 {
+					engineer.SetInterviewResult(character.NewRoundPassed())
+				} else {
+					engineer.SetInterviewResult(character.NewRejection())
+					continue idleFor
+				}
+			}
+			newChar, err := character.NewCharacter(
+				entity.CharacterRoleFounder,
+				spawnX, spawnY,
+				s.questions.GetRandomQuestions(3),
+				randDuration(interviewerLifetimeFrom, interviewerLifetimeTo),
+				c.Company(),
+			)
+			if err != nil {
+				return NewErrorScene(s.game, err), nil
+			}
+			s.characters.Add(newChar)
+		} else if recruiter != nil && character.FilterIdle(recruiter) {
+			if recruiter.GetQuestion() == nil {
+				if recruiter.PlayerPoints() > 0 {
+					recruiter.SetInterviewResult(character.NewRoundPassed())
+				} else {
+					recruiter.SetInterviewResult(character.NewRejection())
+					continue idleFor
+				}
+			}
+			newChar, err := character.NewCharacter(
+				entity.CharacterRoleEngineer,
+				spawnX, spawnY,
+				s.questions.GetRandomQuestions(3),
+				randDuration(interviewerLifetimeFrom, interviewerLifetimeTo),
+				c.Company(),
+			)
+			if err != nil {
+				return NewErrorScene(s.game, err), nil
+			}
+			s.characters.Add(newChar)
 		}
 	}
 	for i := len(s.tokens) - 1; i >= 0; i-- {
@@ -171,50 +245,27 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 	if time.Since(s.nextInterviewerSpawn) > 0 {
 		s.nextInterviewerSpawn = time.Now().Add(randDuration(interviewerSpawnDelayFrom, interviewerSpawnDelayTo))
 		var numRecruiters int
-		for _, c := range s.characters {
-			if c.Role() == entity.CharacterRoleRecruiter {
-				numRecruiters++
-			}
+		for range s.characters.FilterByRoles(entity.CharacterRoleRecruiter) {
+			numRecruiters++
 		}
 		interviewersToSpawn := min(
 			max(interviewerRecruiterPoolSize-numRecruiters, 0),
 			interviewerSpawnBatchSize,
 		)
 		for range interviewersToSpawn {
+			company := hex.EncodeToString(binary.LittleEndian.AppendUint64(nil, uint64(time.Now().UnixNano())))
 			c, err := character.NewCharacter(entity.CharacterRoleRecruiter,
 				float64(rand.IntN(maxSpawnDistance*2)-maxSpawnDistance),
 				float64(rand.IntN(maxSpawnDistance*2)-maxSpawnDistance),
 				s.questions.GetRandomQuestions(3),
 				randDuration(interviewerLifetimeFrom, interviewerLifetimeTo),
+				company,
 			)
 			if err != nil {
 				return NewErrorScene(s.game, err), nil
 			}
-			s.characters = append(s.characters, c)
+			s.characters.Add(c)
 		}
-	}
-	if _, err := s.debug.Update(func(ctx *debugui.Context) error {
-		const x, y = 10, 80
-		ctx.Window("TODO", image.Rect(x, y, x+250, y+140), func(layout debugui.ContainerLayout) {
-			ctx.Text(fmt.Sprintf("FPS: %0.2f; TPS: %0.2f", ebiten.ActualFPS(), ebiten.ActualTPS()))
-			ctx.Text(fmt.Sprintf("%s", time.Now().Format(time.Kitchen)))
-
-			//cx, cy := ebiten.CursorPosition()
-			//ctx.Text(fmt.Sprintf("Point Pos: (%d; %d)", cx, cy))
-			//ctx.Text(fmt.Sprintf("Player Pos: (%0.2f; %0.2f)", s.player.X(), s.player.Y()))
-
-			// TODO убирать про фулскрин, после полминуты игры
-			ctx.Text("Use [Shift]+[F] for fullscreen.")
-			if s.tokensInFocus > 0 {
-				ctx.Text("Use [E] to pick up phrases.")
-			}
-			if s.nearestCharacterIdx >= 0 {
-				ctx.Text("Use [1]-[9] to answer.")
-			}
-		})
-		return nil
-	}); err != nil {
-		return NewErrorScene(s.game, err), nil
 	}
 
 	if ebiten.IsKeyPressed(ebiten.KeyF) && ebiten.IsKeyPressed(ebiten.KeyShift) {
@@ -274,10 +325,10 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 		}
 	}
 
-	s.nearestCharacterIdx = -1
+	var nearestCharacter entity.Character
 	nearestCharacterDistance := 99999.0
 	const contactDeltaRadius = 15.0
-	for idx, c := range s.characters {
+	for c := range s.characters.All() {
 		px, py := s.player.PivotX(), s.player.PivotY()
 		dx := px - c.PivotX()
 		dy := py - c.PivotY()
@@ -286,7 +337,7 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 		if distance2 < (touchRadius+contactDeltaRadius)*(touchRadius+contactDeltaRadius) {
 			c.SetFocus(true)
 			if distance2 < nearestCharacterDistance {
-				s.nearestCharacterIdx = idx
+				nearestCharacter = c
 				nearestCharacterDistance = distance2
 			}
 			if distance2 < touchRadius*touchRadius && distance2 > 0 {
@@ -312,9 +363,12 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 			t := s.inventory[idx].Drop(s.player.X(), s.player.Y())
 			s.inventory[idx] = nil
 
-			if s.nearestCharacterIdx >= 0 {
+			isGiveToCharacter := nearestCharacter != nil &&
+				(nearestCharacter.GetQuestion() != nil ||
+					(nearestCharacter.InterviewResult() != nil && nearestCharacter.InterviewResult().Outcome() == entity.OutcomeOffer))
+			if isGiveToCharacter {
 				answer := t.Answer()
-				s.characters[s.nearestCharacterIdx].AnswerTheQuestion(s.questions, answer)
+				nearestCharacter.AnswerTheQuestion(s.questions, answer)
 			} else {
 				s.tokens = append(s.tokens, t)
 			}
@@ -355,11 +409,35 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 			s.offscreenSignals = append(s.offscreenSignals, sig)
 		}
 	}
-	for _, c := range s.characters {
+	for c := range s.characters.All() {
 		sig, ok := newOffscreenSignal(c, SignalTypeInterviewer, colornames.Darkred)
 		if ok {
 			s.offscreenSignals = append(s.offscreenSignals, sig)
 		}
+	}
+
+	if _, err := s.debug.Update(func(ctx *debugui.Context) error {
+		const x, y = 10, 80
+		ctx.Window("TODO", image.Rect(x, y, x+250, y+140), func(layout debugui.ContainerLayout) {
+			ctx.Text(fmt.Sprintf("FPS: %0.2f; TPS: %0.2f", ebiten.ActualFPS(), ebiten.ActualTPS()))
+			ctx.Text(fmt.Sprintf("%s", time.Now().Format(time.Kitchen)))
+
+			//cx, cy := ebiten.CursorPosition()
+			//ctx.Text(fmt.Sprintf("Point Pos: (%d; %d)", cx, cy))
+			//ctx.Text(fmt.Sprintf("Player Pos: (%0.2f; %0.2f)", s.player.X(), s.player.Y()))
+
+			// TODO убирать про фулскрин, после полминуты игры
+			ctx.Text("Use [Shift]+[F] for fullscreen.")
+			if s.tokensInFocus > 0 {
+				ctx.Text("Use [E] to pick up phrases.")
+			}
+			if nearestCharacter != nil {
+				ctx.Text("Use [1]-[9] to answer.")
+			}
+		})
+		return nil
+	}); err != nil {
+		return NewErrorScene(s.game, err), nil
 	}
 
 	return nil, nil
@@ -374,15 +452,32 @@ func (s *battlefieldScene) Draw(screen *ebiten.Image) {
 		t.Draw(screen, op)
 	}
 
-	for _, c := range s.characters {
+	for c := range s.characters.All() {
 		op := &ebiten.DrawImageOptions{}
 		op.GeoM.Translate(c.TopLeftX()-s.camera.X, c.TopLeftY()-s.camera.Y)
 		c.Draw(screen, op)
+	}
+	for c := range s.characters.All() {
 		if c.IsFocused() {
 			if q := c.GetQuestion(); q != nil {
 				tipX := c.TopLeftX() + c.Width()/2 - s.camera.X
 				tipY := c.TopLeftY() - s.camera.Y
 				drawSpeechBubble(screen, s.fontFace, q.Question(), tipX, tipY)
+			} else if result := c.InterviewResult(); result != nil {
+				tipX := c.TopLeftX() + c.Width()/2 - s.camera.X
+				tipY := c.TopLeftY() - s.camera.Y
+				var msg string
+				switch result.Outcome() {
+				case entity.OutcomeOffer:
+					msg = fmt.Sprintf("We are hiring you.\nYour salary will be $%d.\nDo you accept?", result.Salary())
+				case entity.OutcomeRoundPassed:
+					msg = "Great job!\nYou've passed this round."
+				case entity.OutcomeRejection:
+					msg = "..."
+				}
+				if len(msg) > 0 {
+					drawSpeechBubble(screen, s.fontFace, msg, tipX, tipY)
+				}
 			}
 		}
 	}
