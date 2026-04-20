@@ -15,7 +15,7 @@ type loadScene struct {
 	status       uint8
 	updateTicker *time.Ticker
 
-	questions entity.QuestionsDatabase
+	questions entity.QuestionsForInterview
 }
 
 func NewLoadScene(game entity.Game) entity.Scene {
@@ -50,12 +50,18 @@ func (s *loadScene) Update() (entity.Scene, error) {
 				break loopInProgress
 			default:
 			}
-			if s.questions == nil {
-				questions, err := database.NewQuestionsDatabase(assets.AnswersCSV)
+			if s.questions.Recruiter == nil {
+				questions, err := database.NewQuestionsDatabase(assets.QuestionsRecruiterCSV)
 				if err != nil {
 					return NewErrorScene(s.game, err), nil
 				}
-				s.questions = questions
+				s.questions.Recruiter = questions
+			} else if s.questions.Engineer == nil {
+				questions, err := database.NewQuestionsDatabase(assets.QuestionsEngineerCSV)
+				if err != nil {
+					return NewErrorScene(s.game, err), nil
+				}
+				s.questions.Engineer = questions
 			} else {
 				s.status = loadEndResources
 			}

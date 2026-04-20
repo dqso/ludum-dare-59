@@ -13,10 +13,10 @@ type generateBattlefieldScene struct {
 	status       uint8
 	updateTicker *time.Ticker
 
-	questions entity.QuestionsDatabase
+	questions entity.QuestionsForInterview
 }
 
-func NewGenerateBattlefieldScene(game entity.Game, questions entity.QuestionsDatabase) entity.Scene {
+func NewGenerateBattlefieldScene(game entity.Game, questions entity.QuestionsForInterview) entity.Scene {
 	s := &generateBattlefieldScene{
 		game:      game,
 		questions: questions,

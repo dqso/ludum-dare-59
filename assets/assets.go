@@ -5,8 +5,11 @@ import (
 )
 
 var (
-	//go:embed answers.csv
-	AnswersCSV []byte
+	//go:embed recruiter.csv
+	QuestionsRecruiterCSV []byte
+
+	//go:embed engineer.csv
+	QuestionsEngineerCSV []byte
 
 	//go:embed mainchar.png
 	MainCharPNG []byte

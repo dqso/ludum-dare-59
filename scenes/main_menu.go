@@ -8,10 +8,10 @@ import (
 type mainMenuScene struct {
 	game entity.Game
 
-	questions entity.QuestionsDatabase
+	questions entity.QuestionsForInterview
 }
 
-func NewMainMenuScene(game entity.Game, questions entity.QuestionsDatabase) entity.Scene {
+func NewMainMenuScene(game entity.Game, questions entity.QuestionsForInterview) entity.Scene {
 	return &mainMenuScene{
 		game:      game,
 		questions: questions,

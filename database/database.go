@@ -118,9 +118,10 @@ func NewQuestionsDatabase(csvData []byte) (*QuestionsDatabase, error) {
 	return db, nil
 }
 
-func (d *QuestionsDatabase) GetRandomQuestions(num int) []entity.Question {
+func (d *QuestionsDatabase) GetRandomQuestions(num int) ([]entity.Question, entity.AnswersGrouped) {
+	answers := entity.NewAnswersGrouped()
 	if num == 0 {
-		return make([]entity.Question, 0)
+		return make([]entity.Question, 0), answers
 	}
 	list := make([]entity.Question, len(d.questions))
 	for i, q := range d.questions {
@@ -130,9 +131,21 @@ func (d *QuestionsDatabase) GetRandomQuestions(num int) []entity.Question {
 		list[i], list[j] = list[j], list[i]
 	})
 	if len(list) > num {
-		return list[:num]
+		list = list[:num]
 	}
-	return list
+	for _, e := range list {
+		q := d.byQuestion[e.Question()]
+		for _, a := range q.byAnswers {
+			if a.points > 0 {
+				answers.Positive[a.answer] = struct{}{}
+			} else if a.points == 0 {
+				answers.Neutral[a.answer] = struct{}{}
+			} else {
+				answers.Negative[a.answer] = struct{}{}
+			}
+		}
+	}
+	return list, answers
 }
 
 func (d *QuestionsDatabase) GetRandomAnswers(num int) []entity.Answer {

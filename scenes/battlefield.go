@@ -7,6 +7,7 @@ import (
 	"image"
 	"image/color"
 	"log"
+	"maps"
 	"math"
 	"math/rand/v2"
 	"strconv"
@@ -29,7 +30,7 @@ import (
 
 type battlefieldScene struct {
 	game       entity.Game
-	questions  entity.QuestionsDatabase
+	questions  entity.QuestionsForInterview
 	fontFace10 font.Face
 	fontFace14 font.Face
 
@@ -37,11 +38,12 @@ type battlefieldScene struct {
 	nextTokenSpawn       time.Time
 	nextInterviewerSpawn time.Time
 
-	player     entity.Player
-	camera     Camera
-	characters entity.CharacterList
-	tokens     []entity.Token
-	inventory  [9]entity.CollectedToken
+	player       entity.Player
+	camera       Camera
+	characters   entity.CharacterList
+	tokens       []entity.Token
+	inventory    [9]entity.CollectedToken
+	queueAnswers []AnswerWithPoint
 
 	tokensInFocus    int
 	offscreenSignals []offscreenSignal
@@ -50,6 +52,11 @@ type battlefieldScene struct {
 	expenses []*Expense
 
 	debug debugui.DebugUI
+}
+
+type AnswerWithPoint struct {
+	answer entity.Answer
+	x, y   float64
 }
 
 type offscreenSignal struct {
@@ -103,25 +110,25 @@ type Expense struct {
 }
 
 const (
-	maxSpawnDistance = 500.0
+	maxSpawnDistance = 1500.0
 
-	tokenPoolSize           = 20
-	tokenSpawnBatchSizeFrom = 12
-	tokenSpawnBatchSizeTo   = 15
-	tokenSpawnDelayFrom     = time.Second * 20
-	tokenSpawnDelayTo       = time.Second * 30
+	tokenPoolSize           = 80
+	tokenSpawnBatchSizeFrom = 10
+	tokenSpawnBatchSizeTo   = 20
+	tokenSpawnDelayFrom     = time.Second * 10
+	tokenSpawnDelayTo       = time.Second * 20
 	tokenLifetimeFrom       = time.Second * 50
 	tokenLifetimeTo         = time.Second * 70
 
-	interviewerRecruiterPoolSize = 4
+	interviewerRecruiterPoolSize = 5
 	interviewerSpawnBatchSize    = 1
 	interviewerSpawnDelayFrom    = time.Second * 60
 	interviewerSpawnDelayTo      = time.Second * 90
 	interviewerLifetimeFrom      = time.Minute * 3
 	interviewerLifetimeTo        = time.Minute * 4
 
-	startedMoneyFrom = 1000.00
-	startedMoneyTo   = 2000.00
+	startedMoneyFrom = 2000.00
+	startedMoneyTo   = 3000.00
 	startedSalary    = 0
 
 	coeffRealTime time.Duration = 12 * 24 * 30 // 5 минут = 1 месяц
@@ -139,7 +146,7 @@ func moneyToString(money decimal.Decimal) string {
 	return fmt.Sprintf("$%s", money.StringFixed(2))
 }
 
-func NewBattlefieldScene(game entity.Game, questions entity.QuestionsDatabase) entity.Scene {
+func NewBattlefieldScene(game entity.Game, questions entity.QuestionsForInterview) entity.Scene {
 	winW, winH := game.WindowSize()
 
 	startedMoney := float64(startedMoneyFrom*100+rand.Int64N((startedMoneyTo-startedMoneyFrom)*100)) / 100
@@ -262,10 +269,12 @@ idleFor:
 				}
 			}
 			duration := randDuration(interviewerLifetimeFrom, interviewerLifetimeTo)
+			questions, answers := s.questions.Recruiter.GetRandomQuestions(3) // TODO fix
+			s.queueAnswers = append(getSomeAnswers(answers, spawnX, spawnY), s.queueAnswers...)
 			newChar, err := character.NewCharacter(
 				entity.CharacterRoleFounder,
 				spawnX, spawnY,
-				s.questions.GetRandomQuestions(3),
+				questions,
 				duration,
 				c.Company(),
 			)
@@ -284,10 +293,12 @@ idleFor:
 				}
 			}
 			duration := randDuration(interviewerLifetimeFrom, interviewerLifetimeTo)
+			questions, answers := s.questions.Engineer.GetRandomQuestions(5)
+			s.queueAnswers = append(getSomeAnswers(answers, spawnX, spawnY), s.queueAnswers...)
 			newChar, err := character.NewCharacter(
 				entity.CharacterRoleEngineer,
 				spawnX, spawnY,
-				s.questions.GetRandomQuestions(3),
+				questions,
 				duration,
 				c.Company(),
 			)
@@ -309,13 +320,37 @@ idleFor:
 			max(tokenPoolSize-len(s.tokens), 0),
 			tokenSpawnBatchSizeFrom+rand.IntN(tokenSpawnBatchSizeTo-tokenSpawnBatchSizeFrom),
 		)
-		for _, a := range s.questions.GetRandomAnswers(tokensToSpawn) {
-			t := token.NewToken(s.fontFace14, a,
-				float64(rand.IntN(maxSpawnDistance*2)-maxSpawnDistance),
-				float64(rand.IntN(maxSpawnDistance*2)-maxSpawnDistance),
+		for i := len(s.queueAnswers) - 1; i >= 0 && tokensToSpawn > 0; i-- {
+			tokensToSpawn--
+			var a AnswerWithPoint
+			a, s.queueAnswers = s.queueAnswers[i], s.queueAnswers[:i]
+			spawnAngle := rand.Float64() * 2 * math.Pi
+			spawnR := 400 + rand.Float64()*(1000-400)
+			t := token.NewToken(s.fontFace14, a.answer,
+				a.x+spawnR*math.Cos(spawnAngle),
+				a.y+spawnR*math.Sin(spawnAngle),
 				randDuration(tokenLifetimeFrom, tokenLifetimeTo),
 			)
 			s.tokens = append(s.tokens, t)
+		}
+		rnd := []entity.QuestionsDatabase{
+			s.questions.Recruiter,
+			s.questions.Engineer, // TODO
+		}
+		rand.Shuffle(len(rnd), func(i, j int) {
+			rnd[i], rnd[j] = rnd[j], rnd[i]
+		})
+		for _, q := range rnd {
+			for _, a := range q.GetRandomAnswers(tokensToSpawn / 2) {
+				spawnAngle := rand.Float64() * 2 * math.Pi
+				spawnR := 400 + rand.Float64()*(1000-400)
+				t := token.NewToken(s.fontFace14, a,
+					s.player.X()+spawnR*math.Cos(spawnAngle),
+					s.player.Y()+spawnR*math.Sin(spawnAngle),
+					randDuration(time.Second*10, time.Second*20),
+				)
+				s.tokens = append(s.tokens, t)
+			}
 		}
 	}
 	if time.Since(s.nextInterviewerSpawn) > 0 {
@@ -330,10 +365,13 @@ idleFor:
 		)
 		for range interviewersToSpawn {
 			company := hex.EncodeToString(binary.LittleEndian.AppendUint64(nil, uint64(time.Now().UnixNano())))
+			questions, answers := s.questions.Recruiter.GetRandomQuestions(4)
+			x := float64(rand.IntN(maxSpawnDistance*2) - maxSpawnDistance)
+			y := float64(rand.IntN(maxSpawnDistance*2) - maxSpawnDistance)
+			s.queueAnswers = append(getSomeAnswers(answers, x, y), s.queueAnswers...)
 			c, err := character.NewCharacter(entity.CharacterRoleRecruiter,
-				float64(rand.IntN(maxSpawnDistance*2)-maxSpawnDistance),
-				float64(rand.IntN(maxSpawnDistance*2)-maxSpawnDistance),
-				s.questions.GetRandomQuestions(3),
+				x, y,
+				questions,
 				randDuration(interviewerLifetimeFrom, interviewerLifetimeTo),
 				company,
 			)
@@ -445,7 +483,7 @@ idleFor:
 
 			if nearestCharacter != nil && nearestCharacter.GetQuestion() != nil {
 				answer := t.Answer()
-				nearestCharacter.AnswerTheQuestion(s.questions, answer)
+				nearestCharacter.AnswerTheQuestion(s.questions.Choose(nearestCharacter), answer)
 			} else if nearestCharacter != nil && (nearestCharacter.InterviewResult() != nil && nearestCharacter.InterviewResult().Outcome() == entity.OutcomeOffer) {
 				answer := t.Answer()
 				switch answer.Category() {
@@ -519,6 +557,7 @@ idleFor:
 			ctx.Text(fmt.Sprintf("FPS: %0.2f; TPS: %0.2f", ebiten.ActualFPS(), ebiten.ActualTPS()))
 			ctx.Text(fmt.Sprintf("%s", s.gameTimeNow().Format("Mon, _2 Jan 2006 15:04")))
 			ctx.Text(fmt.Sprintf("%s and salary %s/month", moneyToString(s.player.Money()), moneyToString(s.player.SalaryPerMonth())))
+			ctx.Text(fmt.Sprintf("%d/%d tokens", len(s.tokens), tokenPoolSize))
 
 			//cx, cy := ebiten.CursorPosition()
 			//ctx.Text(fmt.Sprintf("Point Pos: (%d; %d)", cx, cy))
@@ -546,12 +585,10 @@ idleFor:
 
 	for _, e := range s.expenses {
 		if s.gameTimeNow().Sub(e.ScheduledAt) > 0 {
-			log.Printf("now %s", e.ScheduledAt)
 			e.ScheduledAt = e.ScheduledAt.AddDate(0, e.AddMonth, e.AddDays)
 			if e.AddDuration != nil {
 				e.ScheduledAt = e.ScheduledAt.Add(e.AddDuration())
 			}
-			log.Printf("rescheduled %s", e.ScheduledAt)
 
 			var msg string
 			if e.Expense == "salary hack" {
@@ -823,4 +860,34 @@ func init() {
 
 func randDuration(from, to time.Duration) time.Duration {
 	return from + time.Duration(rand.Int64N(int64(to-from)))
+}
+
+func getSomeAnswers(grouped entity.AnswersGrouped, x, y float64) []AnswerWithPoint {
+	out := make([]AnswerWithPoint, 0)
+
+	const maximum = 2
+
+	get := func(m map[entity.Answer]struct{}) {
+		answers := make([]AnswerWithPoint, 0)
+		for k := range maps.Keys(m) {
+			answers = append(answers, AnswerWithPoint{
+				answer: k,
+				x:      x,
+				y:      y,
+			})
+		}
+		rand.Shuffle(len(answers), func(i, j int) {
+			answers[i], answers[j] = answers[j], answers[i]
+		})
+		if len(answers) > maximum {
+			answers = answers[:maximum]
+		}
+		out = append(out, answers...)
+	}
+
+	get(grouped.Positive)
+	get(grouped.Neutral)
+	get(grouped.Negative)
+
+	return out
 }

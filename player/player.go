@@ -43,7 +43,7 @@ func NewPlayer(x, y float64, money, salaryPerMonth decimal.Decimal) (*Player, er
 		h:              targetH,
 		pivotX:         0,
 		pivotY:         0,
-		speed:          5.0,
+		speed:          7.0,
 		sprite:         sprite,
 		money:          money,
 		salaryPerMonth: salaryPerMonth,
