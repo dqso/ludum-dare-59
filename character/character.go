@@ -15,6 +15,7 @@ import (
 const targetH float64 = 45.0
 
 type Character struct {
+	name            string
 	x, y            float64
 	w, h            float64
 	pivotX, pivotY  float64
@@ -31,7 +32,7 @@ type Character struct {
 	interviewResult entity.InterviewResult
 }
 
-func NewCharacter(role entity.CharacterRole, x, y float64, questions []entity.Question, lifetime time.Duration, company string) (*Character, error) {
+func NewCharacter(name string, role entity.CharacterRole, x, y float64, questions []entity.Question, lifetime time.Duration, company string) (*Character, error) {
 	var asset []byte
 	switch role {
 	case entity.CharacterRoleRecruiter:
@@ -61,6 +62,7 @@ func NewCharacter(role entity.CharacterRole, x, y float64, questions []entity.Qu
 		lifetime = time.Hour * 24 * 256 * 5
 	}
 	c := &Character{
+		name:      name,
 		x:         0,
 		y:         0,
 		w:         w,
@@ -83,6 +85,7 @@ func (c Character) Role() entity.CharacterRole {
 	return c.role
 }
 
+func (c Character) Name() string                                      { return c.name }
 func (c Character) X() float64                                        { return c.x }
 func (c Character) Y() float64                                        { return c.y }
 func (c Character) TopLeftX() float64                                 { return c.x - c.w/2 }

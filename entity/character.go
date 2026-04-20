@@ -6,6 +6,7 @@ import (
 )
 
 type Character interface {
+	Name() string
 	Positionable
 	TopLeftGetter
 	PivotGetter

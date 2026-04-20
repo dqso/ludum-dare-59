@@ -17,7 +17,8 @@ type loadScene struct {
 	status       uint8
 	updateTicker *time.Ticker
 
-	questions entity.QuestionsForInterview
+	questions  entity.QuestionsForInterview
+	firstNames entity.FirstNamesDatabase
 }
 
 func NewLoadScene(ctx context.Context, game entity.Game) entity.Scene {
@@ -65,6 +66,12 @@ func (s *loadScene) Update() (entity.Scene, error) {
 					return NewErrorScene(s.ctx, s.game, err), nil
 				}
 				s.questions.Engineer = questions
+			} else if s.firstNames == nil {
+				firstNames, err := database.NewFirstNameDatabase(assets.FemaleFirstNamesTxt, assets.MaleFirstNamesTxt)
+				if err != nil {
+					return NewErrorScene(s.ctx, s.game, err), nil
+				}
+				s.firstNames = firstNames
 			} else {
 				s.status = loadEndResources
 			}
@@ -73,7 +80,7 @@ func (s *loadScene) Update() (entity.Scene, error) {
 	case loadEndResources:
 		// Почистить память
 
-		return NewMainMenuScene(s.ctx, s.game, s.questions), nil
+		return NewMainMenuScene(s.ctx, s.game, s.questions, s.firstNames), nil
 	}
 	return nil, nil
 }

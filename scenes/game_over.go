@@ -25,10 +25,11 @@ type gameOverScene struct {
 	ui         *ebitenui.UI
 	fontFace10 font.Face
 	questions  entity.QuestionsForInterview
+	firstNames entity.FirstNamesDatabase
 	next       entity.Scene
 }
 
-func NewGameOverScene(ctx context.Context, game entity.Game, fontFace10 font.Face, questions entity.QuestionsForInterview, stats entity.Stats) entity.Scene {
+func NewGameOverScene(ctx context.Context, game entity.Game, fontFace10 font.Face, questions entity.QuestionsForInterview, firstNames entity.FirstNamesDatabase, stats entity.Stats) entity.Scene {
 	bgImg, _, err := image.Decode(bytes.NewReader(assets.GameOverPNG))
 	if err != nil {
 		return NewErrorScene(ctx, game, err)
@@ -37,6 +38,7 @@ func NewGameOverScene(ctx context.Context, game entity.Game, fontFace10 font.Fac
 	s := &gameOverScene{
 		ctx:        ctx,
 		game:       game,
+		firstNames: firstNames,
 		bg:         ebiten.NewImageFromImage(bgImg),
 		fontFace10: fontFace10,
 		questions:  questions,
@@ -141,7 +143,7 @@ func NewGameOverScene(ctx context.Context, game entity.Game, fontFace10 font.Fac
 			}),
 		),
 		widget.ButtonOpts.ClickedHandler(func(args *widget.ButtonClickedEventArgs) {
-			s.next = NewMainMenuScene(ctx, s.game, s.questions)
+			s.next = NewMainMenuScene(ctx, s.game, s.questions, s.firstNames)
 		}),
 	)
 

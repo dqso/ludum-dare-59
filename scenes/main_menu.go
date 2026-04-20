@@ -11,20 +11,22 @@ type mainMenuScene struct {
 	ctx  context.Context
 	game entity.Game
 
-	questions entity.QuestionsForInterview
+	questions  entity.QuestionsForInterview
+	firstNames entity.FirstNamesDatabase
 }
 
-func NewMainMenuScene(ctx context.Context, game entity.Game, questions entity.QuestionsForInterview) entity.Scene {
+func NewMainMenuScene(ctx context.Context, game entity.Game, questions entity.QuestionsForInterview, firstNames entity.FirstNamesDatabase) entity.Scene {
 	return &mainMenuScene{
-		ctx:       ctx,
-		game:      game,
-		questions: questions,
+		ctx:        ctx,
+		game:       game,
+		questions:  questions,
+		firstNames: firstNames,
 	}
 }
 
 func (s *mainMenuScene) Update() (entity.Scene, error) {
 	// TODO
-	return NewGenerateBattlefieldScene(s.ctx, s.game, s.questions), nil
+	return NewGenerateBattlefieldScene(s.ctx, s.game, s.questions, s.firstNames), nil
 }
 
 func (s *mainMenuScene) Draw(screen *ebiten.Image) {}

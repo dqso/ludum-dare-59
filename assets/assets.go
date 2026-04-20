@@ -5,6 +5,12 @@ import (
 )
 
 var (
+	//go:embed female-first-names.txt
+	FemaleFirstNamesTxt []byte
+
+	//go:embed male-first-names.txt
+	MaleFirstNamesTxt []byte
+
 	//go:embed GameOver.png
 	GameOverPNG []byte
 

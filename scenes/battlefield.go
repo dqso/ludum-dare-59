@@ -33,6 +33,7 @@ type battlefieldScene struct {
 	ctx        context.Context
 	game       entity.Game
 	questions  entity.QuestionsForInterview
+	firstNames entity.FirstNamesDatabase
 	fontFace10 font.Face
 	fontFace14 font.Face
 
@@ -152,7 +153,7 @@ func moneyToString(money decimal.Decimal) string {
 	return fmt.Sprintf("$%s", money.StringFixed(2))
 }
 
-func NewBattlefieldScene(ctx context.Context, game entity.Game, questions entity.QuestionsForInterview) entity.Scene {
+func NewBattlefieldScene(ctx context.Context, game entity.Game, questions entity.QuestionsForInterview, firstNames entity.FirstNamesDatabase) entity.Scene {
 	winW, winH := game.WindowSize()
 
 	startedMoney := float64(startedMoneyFrom*100+rand.Int64N((startedMoneyTo-startedMoneyFrom)*100)) / 100
@@ -191,6 +192,7 @@ func NewBattlefieldScene(ctx context.Context, game entity.Game, questions entity
 		ctx:        ctx,
 		game:       game,
 		questions:  questions,
+		firstNames: firstNames,
 		fontFace10: fontFace10,
 		fontFace14: fontFace14,
 
@@ -236,7 +238,7 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 		s.stats.RealTimePlayed = time.Since(s.gameStart)
 		s.stats.CurrentBalance = s.player.Money()
 		s.stats.MonthlySalary = s.player.SalaryPerMonth()
-		return NewGameOverScene(s.ctx, s.game, s.fontFace10, s.questions, s.stats), nil
+		return NewGameOverScene(s.ctx, s.game, s.fontFace10, s.questions, s.firstNames, s.stats), nil
 	}
 	for c, deleted := range s.characters.DeleteFunc(func(c entity.Character) bool {
 		return time.Since(c.Deadline()) > 0
@@ -290,7 +292,7 @@ idleFor:
 			duration := randDuration(interviewerLifetimeFrom, interviewerLifetimeTo)
 			questions, answers := s.questions.Recruiter.GetRandomQuestions(3) // TODO fix
 			s.queueAnswers = append(getSomeAnswers(answers, spawnX, spawnY), s.queueAnswers...)
-			newChar, err := character.NewCharacter(
+			newChar, err := character.NewCharacter(s.firstNames.GetRandomMaleFirstName(),
 				entity.CharacterRoleFounder,
 				spawnX, spawnY,
 				questions,
@@ -315,7 +317,7 @@ idleFor:
 			duration := randDuration(interviewerLifetimeFrom, interviewerLifetimeTo)
 			questions, answers := s.questions.Engineer.GetRandomQuestions(5)
 			s.queueAnswers = append(getSomeAnswers(answers, spawnX, spawnY), s.queueAnswers...)
-			newChar, err := character.NewCharacter(
+			newChar, err := character.NewCharacter(s.firstNames.GetRandomMaleFirstName(),
 				entity.CharacterRoleEngineer,
 				spawnX, spawnY,
 				questions,
@@ -389,7 +391,8 @@ idleFor:
 			x := float64(rand.IntN(maxSpawnDistance*2) - maxSpawnDistance)
 			y := float64(rand.IntN(maxSpawnDistance*2) - maxSpawnDistance)
 			s.queueAnswers = append(getSomeAnswers(answers, x, y), s.queueAnswers...)
-			c, err := character.NewCharacter(entity.CharacterRoleRecruiter,
+			firstName := s.firstNames.GetRandomFemaleFirstName()
+			c, err := character.NewCharacter(firstName, entity.CharacterRoleRecruiter,
 				x, y,
 				questions,
 				randDuration(interviewerLifetimeFrom, interviewerLifetimeTo),
@@ -399,8 +402,12 @@ idleFor:
 				return NewErrorScene(s.ctx, s.game, err), nil
 			}
 			s.characters.Add(c)
+			msg := fmt.Sprintf(
+				"Hey, Anonymous!\nI'm %s.\nWe're looking for a developer to join our team.\nInterested in a chat?",
+				firstName,
+			)
 			s.messages = append(s.messages, Message{
-				message:   "Hey, Anonymous!\nWe're looking for a developer to join our team.\nInterested in a chat?",
+				message:   msg,
 				expiredTo: time.Now().Add(time.Second * 8),
 			})
 		}
@@ -660,7 +667,7 @@ func (s *battlefieldScene) Draw(screen *ebiten.Image) {
 			if q := c.GetQuestion(); q != nil {
 				tipX := c.TopLeftX() + c.Width()/2 - s.camera.X
 				tipY := c.TopLeftY() - s.camera.Y
-				drawSpeechBubble(screen, s.fontFace14, q.Question(), tipX, tipY)
+				drawSpeechBubble(screen, s.fontFace10, s.fontFace14, c.Name(), q.Question(), tipX, tipY)
 			} else if result := c.InterviewResult(); result != nil {
 				tipX := c.TopLeftX() + c.Width()/2 - s.camera.X
 				tipY := c.TopLeftY() - s.camera.Y
@@ -674,7 +681,7 @@ func (s *battlefieldScene) Draw(screen *ebiten.Image) {
 					msg = "..."
 				}
 				if len(msg) > 0 {
-					drawSpeechBubble(screen, s.fontFace14, msg, tipX, tipY)
+					drawSpeechBubble(screen, s.fontFace10, s.fontFace14, c.Name(), msg, tipX, tipY)
 				}
 			}
 		}
@@ -768,15 +775,16 @@ func drawChevronSignal(screen *ebiten.Image, x, y, angle float64, clr color.Colo
 	}
 }
 
-func drawSpeechBubble(screen *ebiten.Image, face font.Face, txt string, tipX, tipY float64) {
+func drawSpeechBubble(screen *ebiten.Image, face10, face14 font.Face, name, msg string, tipX, tipY float64) {
 	const pad = 10.0
 	const r = 8.0
 	const arrowH = 14.0
 	const arrowHalfW = 8.0
 
-	bounds := text.BoundString(face, txt)
-	w := float64(bounds.Dx()) + pad*2
-	h := float64(bounds.Dy()) + pad*2
+	boundsName := text.BoundString(face10, name)
+	boundsMsg := text.BoundString(face14, msg)
+	w := float64(boundsName.Dx()) + float64(boundsMsg.Dx()) + pad*2
+	h := float64(boundsName.Dy()) + float64(boundsMsg.Dy()) + pad*3
 
 	x := tipX - w/2
 	y := tipY - h - arrowH
@@ -818,9 +826,14 @@ func drawSpeechBubble(screen *ebiten.Image, face font.Face, txt string, tipX, ti
 	screen.DrawTriangles(vs, is, whiteImage, opts)
 
 	op := &ebiten.DrawImageOptions{}
+	op.ColorM.ScaleWithColor(colornames.Darkred)
+	op.GeoM.Translate(x+pad-float64(boundsName.Min.X), y+pad-float64(boundsName.Min.Y))
+	text.DrawWithOptions(screen, name, face10, op)
+
+	op = &ebiten.DrawImageOptions{}
 	op.ColorM.ScaleWithColor(colornames.Black)
-	op.GeoM.Translate(x+pad-float64(bounds.Min.X), y+pad-float64(bounds.Min.Y))
-	text.DrawWithOptions(screen, txt, face, op)
+	op.GeoM.Translate(x+pad-float64(boundsMsg.Min.X), y+pad+float64(boundsName.Dy())+pad-float64(boundsMsg.Min.Y))
+	text.DrawWithOptions(screen, msg, face14, op)
 }
 
 func drawToasts(screen *ebiten.Image, face font.Face, messages []Message, winW, winH float64) {

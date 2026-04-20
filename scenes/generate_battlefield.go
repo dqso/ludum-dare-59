@@ -15,15 +15,17 @@ type generateBattlefieldScene struct {
 	status       uint8
 	updateTicker *time.Ticker
 
-	questions entity.QuestionsForInterview
+	questions  entity.QuestionsForInterview
+	firstNames entity.FirstNamesDatabase
 }
 
-func NewGenerateBattlefieldScene(ctx context.Context, game entity.Game, questions entity.QuestionsForInterview) entity.Scene {
+func NewGenerateBattlefieldScene(ctx context.Context, game entity.Game, questions entity.QuestionsForInterview, firstNames entity.FirstNamesDatabase) entity.Scene {
 	s := &generateBattlefieldScene{
-		ctx:       ctx,
-		game:      game,
-		questions: questions,
-		status:    generateBattlefieldStartResources,
+		ctx:        ctx,
+		game:       game,
+		questions:  questions,
+		status:     generateBattlefieldStartResources,
+		firstNames: firstNames,
 	}
 
 	return s
@@ -58,7 +60,7 @@ func (s *generateBattlefieldScene) Update() (entity.Scene, error) {
 	case generateBattlefieldEndResources:
 		// Почистить память
 
-		return NewBattlefieldScene(s.ctx, s.game, s.questions), nil
+		return NewBattlefieldScene(s.ctx, s.game, s.questions, s.firstNames), nil
 	}
 	return nil, nil
 }

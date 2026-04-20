@@ -11,6 +11,11 @@ type QuestionsForInterview struct {
 	Engineer  QuestionsDatabase
 }
 
+type FirstNamesDatabase interface {
+	GetRandomFemaleFirstName() string
+	GetRandomMaleFirstName() string
+}
+
 func (q QuestionsForInterview) Choose(roleGetter interface {
 	Role() CharacterRole
 }) QuestionsDatabase {
