@@ -5,7 +5,7 @@ go 1.26.2
 require (
 	github.com/ebitengine/debugui v0.2.0
 	github.com/hajimehoshi/ebiten/v2 v2.9.9
-	golang.org/x/image v0.31.0
+	golang.org/x/image v0.39.0
 )
 
 require (
@@ -25,7 +25,7 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
-	golang.org/x/sync v0.17.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.36.0 // indirect
-	golang.org/x/text v0.29.0 // indirect
+	golang.org/x/text v0.36.0 // indirect
 )

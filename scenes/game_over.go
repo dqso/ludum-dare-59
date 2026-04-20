@@ -7,46 +7,37 @@ import (
 	"image"
 	"image/color"
 	_ "image/png"
-	"time"
 
 	"github.com/dqso/ludum-dare-59/assets"
 	"github.com/dqso/ludum-dare-59/entity"
 	"github.com/ebitenui/ebitenui"
 	euiimage "github.com/ebitenui/ebitenui/image"
 	"github.com/ebitenui/ebitenui/widget"
-	"github.com/fogleman/primitive/primitive"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/text/v2"
-	"github.com/hajimehoshi/ebiten/v2/vector"
 	"golang.org/x/image/font"
 )
 
 type gameOverScene struct {
 	ctx        context.Context
 	game       entity.Game
+	bg         *ebiten.Image
 	ui         *ebitenui.UI
 	fontFace10 font.Face
 	questions  entity.QuestionsForInterview
 	next       entity.Scene
-
-	whiteSub   *ebiten.Image
-	model      *primitive.Model
-	tris       []Tri
-	stepsLeft  int
-	bg         color.NRGBA
-	imgW, imgH int
-}
-
-type Tri struct {
-	x0, x1, x2 float32
-	y0, y1, y2 float32
-	r, g, b, a float32
 }
 
 func NewGameOverScene(ctx context.Context, game entity.Game, fontFace10 font.Face, questions entity.QuestionsForInterview, stats entity.Stats) entity.Scene {
+	bgImg, _, err := image.Decode(bytes.NewReader(assets.GameOverPNG))
+	if err != nil {
+		return NewErrorScene(ctx, game, err)
+	}
+
 	s := &gameOverScene{
 		ctx:        ctx,
 		game:       game,
+		bg:         ebiten.NewImageFromImage(bgImg),
 		fontFace10: fontFace10,
 		questions:  questions,
 	}
@@ -163,28 +154,6 @@ func NewGameOverScene(ctx context.Context, game entity.Game, fontFace10 font.Fac
 
 	s.ui = &ebitenui.UI{Container: rootContainer}
 
-	const steps = 3000
-
-	whiteImage := ebiten.NewImage(3, 3)
-	whiteImage.Fill(color.White)
-	s.whiteSub = whiteImage.SubImage(image.Rect(1, 1, 2, 2)).(*ebiten.Image)
-
-	imgSrc, _, err := image.Decode(bytes.NewReader(assets.GameOverPNG))
-	if err != nil {
-		return NewErrorScene(ctx, game, err)
-	}
-	src := ebiten.NewImageFromImage(imgSrc)
-
-	b := src.Bounds()
-	bg := primitive.MakeColor(primitive.AverageImageColor(src))
-	model := primitive.NewModel(src, bg, 256, 4)
-
-	s.model = model
-	s.bg = bg.NRGBA()
-	s.stepsLeft = steps
-	s.imgW = b.Max.X
-	s.imgH = b.Max.Y
-
 	return s
 }
 
@@ -194,51 +163,17 @@ func (s *gameOverScene) Update() (entity.Scene, error) {
 		return s.next, nil
 	}
 
-	deadline := time.Now().Add(8 * time.Millisecond)
-	for s.stepsLeft > 0 && time.Now().Before(deadline) {
-		s.model.Step(primitive.ShapeTypeTriangle, 128, 0)
-		s.stepsLeft--
-		shape := s.model.Shapes[len(s.model.Shapes)-1]
-		if t, ok := shape.(*primitive.Triangle); ok {
-			c := s.model.Colors[len(s.model.Colors)-1]
-			s.tris = append(s.tris, Tri{
-				x0: float32(t.X1), y0: float32(t.Y1),
-				x1: float32(t.X2), y1: float32(t.Y2),
-				x2: float32(t.X3), y2: float32(t.Y3),
-				r: float32(c.R) / 255,
-				g: float32(c.G) / 255,
-				b: float32(c.B) / 255,
-				a: float32(c.A) / 255,
-			})
-		}
-	}
-
 	return nil, nil
 }
 
 func (s *gameOverScene) Draw(screen *ebiten.Image) {
 	winW, winH := s.game.WindowSize()
-	scaleX := float32(winW) / float32(s.imgW)
-	scaleY := float32(winH) / float32(s.imgH)
+	scaleX := float64(winW) / float64(s.bg.Bounds().Dx())
+	scaleY := float64(winH) / float64(s.bg.Bounds().Dy())
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(scaleX, scaleY)
+	screen.DrawImage(s.bg, op)
 
-	for _, t := range s.tris {
-		var p vector.Path
-		p.MoveTo(t.x0*scaleX, t.y0*scaleY)
-		p.LineTo(t.x1*scaleX, t.y1*scaleY)
-		p.LineTo(t.x2*scaleX, t.y2*scaleY)
-		p.Close()
-
-		vs, is := p.AppendVerticesAndIndicesForFilling(nil, nil)
-		for i := range vs {
-			vs[i].SrcX = 1
-			vs[i].SrcY = 1
-			vs[i].ColorR = t.r
-			vs[i].ColorG = t.g
-			vs[i].ColorB = t.b
-			vs[i].ColorA = t.a
-		}
-		screen.DrawTriangles(vs, is, s.whiteSub, nil)
-	}
 	s.ui.Draw(screen)
 }
 
