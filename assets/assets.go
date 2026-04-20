@@ -43,4 +43,13 @@ var (
 
 	//go:embed CascadiaMono.ttf
 	CascadiaMonoTTF []byte
+
+	//go:embed music1.mp3
+	Music1MP3 []byte
+
+	//go:embed music2.mp3
+	Music2MP3 []byte
+
+	//go:embed music3.mp3
+	Music3MP3 []byte
 )

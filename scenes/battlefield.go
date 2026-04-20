@@ -1,6 +1,7 @@
 package scenes
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"image/color"
@@ -19,6 +20,8 @@ import (
 	"github.com/dqso/ludum-dare-59/token"
 	"github.com/ebitengine/debugui"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/audio"
+	"github.com/hajimehoshi/ebiten/v2/audio/mp3"
 	"github.com/hajimehoshi/ebiten/v2/text"
 	"github.com/hajimehoshi/ebiten/v2/vector"
 	"github.com/shopspring/decimal"
@@ -26,6 +29,8 @@ import (
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/opentype"
 )
+
+var globalAudioContext = audio.NewContext(44100)
 
 type battlefieldScene struct {
 	ctx        context.Context
@@ -59,6 +64,10 @@ type battlefieldScene struct {
 	stats entity.Stats
 
 	debug debugui.DebugUI
+
+	musicTracks  [][]byte
+	currentTrack int
+	musicPlayer  *audio.Player
 }
 
 type AnswerWithPoint struct {
@@ -254,8 +263,30 @@ func NewBattlefieldScene(ctx context.Context, game entity.Game, questions entity
 		messages: make([]Message, 0),
 		expenses: expenses,
 
-		options: options,
+		options:      options,
+		musicTracks:  [][]byte{assets.Music1MP3, assets.Music2MP3, assets.Music3MP3},
+		currentTrack: -1,
 	}
+}
+
+func (s *battlefieldScene) playTrack(idx int) {
+	if s.musicPlayer != nil {
+		s.musicPlayer.Close()
+		s.musicPlayer = nil
+	}
+	decoded, err := mp3.DecodeWithSampleRate(globalAudioContext.SampleRate(), bytes.NewReader(s.musicTracks[idx]))
+	if err != nil {
+		log.Printf("music decode error: %v", err)
+		return
+	}
+	p, err := globalAudioContext.NewPlayer(decoded)
+	if err != nil {
+		log.Printf("music player error: %v", err)
+		return
+	}
+	p.SetVolume(s.options.MusicVolume)
+	p.Play()
+	s.musicPlayer = p
 }
 
 func (s *battlefieldScene) Update() (entity.Scene, error) {
@@ -272,6 +303,11 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 		}
 		return NewGameOverScene(s.ctx, _type, s.game, s.stampatelloFaceto10, s.questions, s.firstNames, s.stats), nil
 	}
+	if s.options.MusicVolume > 0 && (s.musicPlayer == nil || !s.musicPlayer.IsPlaying()) {
+		s.currentTrack = (s.currentTrack + 1) % len(s.musicTracks)
+		s.playTrack(s.currentTrack)
+	}
+
 	for c, deleted := range s.characters.DeleteFunc(func(c entity.Character) bool {
 		return time.Since(c.Deadline()) > 0
 	}) {

@@ -38,6 +38,7 @@ type mainMenuScene struct {
 	helpUI                *ebitenui.UI
 	techInterviewBtn      *widget.Button
 	decreaseDifficultyBtn *widget.Button
+	musicVolumeBtn        *widget.Button
 
 	next entity.Scene
 	quit bool
@@ -52,6 +53,7 @@ func NewMainMenuScene(ctx context.Context, game entity.Game, questions entity.Qu
 		options: entity.GameOptions{
 			TechInterview:      true,
 			DecreaseDifficulty: true,
+			MusicVolume:        0.2,
 		},
 	}
 
@@ -170,6 +172,18 @@ func NewMainMenuScene(ctx context.Context, game entity.Game, questions entity.Qu
 		),
 	))
 
+	s.musicVolumeBtn = newButton(s.musicVolumeLabel(), func() {
+		levels := musicVolumeLevels()
+		for i, v := range levels {
+			if v == s.options.MusicVolume {
+				s.options.MusicVolume = levels[(i+1)%len(levels)]
+				return
+			}
+		}
+		s.options.MusicVolume = levels[1]
+	})
+	optC.AddChild(s.musicVolumeBtn)
+
 	optC.AddChild(newButton("Back", func() {
 		s.screen = mainMenuScreenMain
 	}))
@@ -248,6 +262,17 @@ func (s *mainMenuScene) decreaseDifficultyLabel() string {
 	return fmt.Sprintf("Decrease Difficulty [%s]", state)
 }
 
+func musicVolumeLevels() []float64 { return []float64{0, 0.1, 0.2, 0.5, 0.7, 1.0} }
+
+func (s *mainMenuScene) musicVolumeLabel() string {
+	labels := map[float64]string{0: "Off", 0.1: "Very Low", 0.2: "Low", 0.5: "Medium", 0.7: "High", 1.0: "Max"}
+	name, ok := labels[s.options.MusicVolume]
+	if !ok {
+		name = "Custom"
+	}
+	return fmt.Sprintf("Music Volume [%s]", name)
+}
+
 func (s *mainMenuScene) Update() (entity.Scene, error) {
 	if s.quit {
 		return nil, ebiten.Termination
@@ -271,6 +296,7 @@ func (s *mainMenuScene) Update() (entity.Scene, error) {
 		}
 		s.techInterviewBtn.Text().Label = s.techInterviewLabel()
 		s.decreaseDifficultyBtn.Text().Label = s.decreaseDifficultyLabel()
+		s.musicVolumeBtn.Text().Label = s.musicVolumeLabel()
 		s.optionsUI.Update()
 
 	case mainMenuScreenHelp:
