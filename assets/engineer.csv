@@ -1,4 +1,4 @@
-answer,category,"Назови тип данных в Go, в котором можно хранить число.",В каком типе данных можно хранить текст в Go?,Что мы можем использовать для работы с хеш-таблицей в Go?,Как мы можем хранить несколько элементов в Go?,Что можно в Go использовать в качестве ключа в хеш-таблице?,Что можно передать в функцию как аргумент в Go?,Какие механизмы есть в Go для работы с ошибками?
+answer,category,"Which data type in Go can store a number?","Which data type in Go can store text?","What can we use to work with a hash table in Go?","How can we store multiple elements in Go?","What can be used as a key in a hash table in Go?","What can be passed to a function as an argument in Go?","Which mechanisms does Go have for error handling?"
 true,programming,-7,-8,-8,-8,3,6,-7
 false,programming,-7,-8,-8,-8,3,6,-7
 nil,programming,-8,-8,-8,-8,-6,5,5
