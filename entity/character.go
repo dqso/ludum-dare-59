@@ -21,6 +21,7 @@ type Character interface {
 	GetQuestion() Question
 	AnswerTheQuestion(questionsDatabase QuestionsDatabase, answer Answer)
 	Deadline() time.Time
+	UpdateDeadline(delay time.Duration)
 	InterviewResult() InterviewResult
 	SetInterviewResult(offer InterviewResult)
 	PlayerPoints() int

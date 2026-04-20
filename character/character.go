@@ -96,6 +96,7 @@ func (c Character) Height() float64                                   { return c
 func (c *Character) SetFocus(focus bool)                              { c.focused = focus }
 func (c Character) IsFocused() bool                                   { return c.focused }
 func (c Character) Deadline() time.Time                               { return c.deadline }
+func (c *Character) UpdateDeadline(delay time.Duration)               { c.deadline = time.Now().Add(delay) }
 func (c Character) Company() string                                   { return c.company }
 func (c *Character) SetCompany(company string)                        { c.company = company }
 func (c Character) InterviewResult() entity.InterviewResult           { return c.interviewResult }

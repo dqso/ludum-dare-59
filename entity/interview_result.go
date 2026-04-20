@@ -1,8 +1,10 @@
 package entity
 
+import "github.com/shopspring/decimal"
+
 type InterviewResult interface {
 	Outcome() Outcome
-	Salary() int
+	Salary() decimal.Decimal
 }
 
 type Outcome string

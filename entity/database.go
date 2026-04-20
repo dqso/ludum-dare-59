@@ -25,7 +25,8 @@ type AnswerCategory string
 
 const (
 	AnswerCategoryEvasive   AnswerCategory = "evasive"   // уклончивые
-	AnswerCategoryBinary    AnswerCategory = "binary"    // бинарные
+	AnswerCategoryBinaryYes AnswerCategory = "yes"       // бинарные: да
+	AnswerCategoryBinaryNo  AnswerCategory = "no"        // бинарные: нет
 	AnswerCategoryFrequency AnswerCategory = "frequency" // частотные
 	AnswerCategoryEmotional AnswerCategory = "emotional" // эмоциональные
 	AnswerCategoryQuantity  AnswerCategory = "quantity"  // количество или время
@@ -35,7 +36,7 @@ func AnswerCategoryToColor(_type AnswerCategory) color.Color {
 	switch _type {
 	case AnswerCategoryEvasive:
 		return colornames.Ivory
-	case AnswerCategoryBinary:
+	case AnswerCategoryBinaryYes, AnswerCategoryBinaryNo:
 		return colornames.Springgreen
 	case AnswerCategoryFrequency:
 		return colornames.Honeydew
@@ -51,7 +52,7 @@ func AnswerCategoryToColor(_type AnswerCategory) color.Color {
 func (t AnswerCategory) IsValid() bool {
 	switch t {
 	case AnswerCategoryEvasive:
-	case AnswerCategoryBinary:
+	case AnswerCategoryBinaryYes, AnswerCategoryBinaryNo:
 	case AnswerCategoryFrequency:
 	case AnswerCategoryEmotional:
 	case AnswerCategoryQuantity:

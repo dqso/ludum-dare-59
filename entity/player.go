@@ -1,6 +1,9 @@
 package entity
 
-import "github.com/hajimehoshi/ebiten/v2"
+import (
+	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/shopspring/decimal"
+)
 
 type Positionable interface {
 	X() float64
@@ -46,4 +49,9 @@ type Player interface {
 	SpeedGetter
 	Movable
 	Drawable
+
+	Money() decimal.Decimal
+	SalaryPerMonth() decimal.Decimal
+	AddMoney(money decimal.Decimal)
+	AddSalaryPerMonth(salary decimal.Decimal)
 }
