@@ -59,7 +59,8 @@ type battlefieldScene struct {
 	messages []Message
 	expenses []*Expense
 
-	options entity.GameOptions
+	options      entity.GameOptions
+	minNumPoints int
 
 	stats entity.Stats
 
@@ -240,6 +241,16 @@ func NewBattlefieldScene(ctx context.Context, game entity.Game, questions entity
 		})
 	}
 
+	musicTracks := [][]byte{assets.Music1MP3, assets.Music2MP3, assets.Music3MP3}
+	rand.Shuffle(len(musicTracks), func(i, j int) {
+		musicTracks[i], musicTracks[j] = musicTracks[j], musicTracks[i]
+	})
+
+	minNumPoints := 5
+	if options.DecreaseDifficulty {
+		minNumPoints = 2
+	}
+
 	now := time.Now()
 	return &battlefieldScene{
 		ctx:        ctx,
@@ -264,7 +275,8 @@ func NewBattlefieldScene(ctx context.Context, game entity.Game, questions entity
 		expenses: expenses,
 
 		options:      options,
-		musicTracks:  [][]byte{assets.Music1MP3, assets.Music2MP3, assets.Music3MP3},
+		minNumPoints: minNumPoints,
+		musicTracks:  musicTracks,
 		currentTrack: -1,
 	}
 }
@@ -335,7 +347,7 @@ idleFor:
 		spawnX, spawnY := recruiter.X()+math.Cos(spawnAngle)*spawnDist, recruiter.Y()+math.Sin(spawnAngle)*spawnDist
 		if founder != nil && character.FilterIdle(founder) {
 			if founder.GetQuestion() == nil {
-				if founder.PlayerPoints() > 0 {
+				if founder.PlayerPoints() >= s.minNumPoints {
 					founder.SetInterviewResult(character.NewRoundPassed())
 				} else {
 					founder.SetInterviewResult(character.NewRejection())
@@ -352,7 +364,7 @@ idleFor:
 			founder.UpdateDeadline(duration)
 		} else if engineer != nil && character.FilterIdle(engineer) && s.options.TechInterview {
 			if engineer.GetQuestion() == nil {
-				if engineer.PlayerPoints() > 0 {
+				if engineer.PlayerPoints() >= s.minNumPoints {
 					engineer.SetInterviewResult(character.NewRoundPassed())
 				} else {
 					engineer.SetInterviewResult(character.NewRejection())
@@ -377,7 +389,7 @@ idleFor:
 			engineer.UpdateDeadline(duration)
 		} else if recruiter != nil && character.FilterIdle(recruiter) {
 			if recruiter.GetQuestion() == nil {
-				if recruiter.PlayerPoints() > 0 {
+				if recruiter.PlayerPoints() >= s.minNumPoints {
 					recruiter.SetInterviewResult(character.NewRoundPassed())
 				} else {
 					recruiter.SetInterviewResult(character.NewRejection())
@@ -713,6 +725,7 @@ idleFor:
 }
 
 func (s *battlefieldScene) Draw(screen *ebiten.Image) {
+	drawBackground(screen, s.camera.X, s.camera.Y)
 	winW, winH := s.game.WindowSize()
 
 	for _, t := range s.tokens {
@@ -794,6 +807,60 @@ func (s *battlefieldScene) Draw(screen *ebiten.Image) {
 }
 
 func (s *battlefieldScene) Name() string { return "Battlefield" }
+
+var circuitCache = map[[2]int]int{} // col,row -> тип
+
+func cellType(col, row int) int {
+	key := [2]int{col, row}
+	if t, ok := circuitCache[key]; ok {
+		return t
+	}
+	// детерминированный рандом по координатам
+	h := col*73856093 ^ row*19349663
+	t := ((h % 5) + 5) % 5 // 0=пусто 1=горизонталь 2=вертикаль 3=угол 4=точка
+	circuitCache[key] = t
+	return t
+}
+
+func drawBackground(screen *ebiten.Image, cameraX, cameraY float64) {
+	const S = 40.0
+	W := float64(screen.Bounds().Dx())
+	H := float64(screen.Bounds().Dy())
+
+	ox := math.Mod(-cameraX, S)
+	if ox < 0 {
+		ox += S
+	}
+	oy := math.Mod(-cameraY, S)
+	if oy < 0 {
+		oy += S
+	}
+
+	clr := color.RGBA{15, 35, 15, 50}
+
+	colStart := int(math.Floor(cameraX / S))
+	rowStart := int(math.Floor(cameraY / S))
+
+	for ci := -1; float64(ci)*S+ox < W+S; ci++ {
+		for ri := -1; float64(ri)*S+oy < H+S; ri++ {
+			x := float32(float64(ci)*S + ox)
+			y := float32(float64(ri)*S + oy)
+			mx, my := x+S/2, y+S/2
+
+			switch cellType(colStart+ci, rowStart+ri) {
+			case 1: // горизонталь
+				vector.StrokeLine(screen, x, my, x+S, my, 1, clr, false)
+			case 2: // вертикаль
+				vector.StrokeLine(screen, mx, y, mx, y+S, 1, clr, false)
+			case 3: // угол
+				vector.StrokeLine(screen, x, my, mx, my, 1, clr, false)
+				vector.StrokeLine(screen, mx, my, mx, y, 1, clr, false)
+			case 4: // точка
+				vector.DrawFilledCircle(screen, mx, my, 3, clr, false)
+			}
+		}
+	}
+}
 
 func drawChevronSignal(screen *ebiten.Image, x, y, angle float64, clr color.Color) {
 	const size = 7.0
