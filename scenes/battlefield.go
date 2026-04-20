@@ -292,13 +292,16 @@ func (s *battlefieldScene) playNotification() {
 		log.Printf("notification player error: %v", err)
 		return
 	}
-	p.SetVolume(0.6)
+	p.SetVolume(s.options.SoundVolume)
 	p.Play()
 }
 
 func (s *battlefieldScene) playTrack(idx int) {
 	if s.musicPlayer != nil {
-		s.musicPlayer.Close()
+		s.musicPlayer.Pause()
+		if err := s.musicPlayer.Close(); err != nil {
+			log.Printf("musicPlayer close error: %v", err)
+		}
 		s.musicPlayer = nil
 	}
 	decoded, err := mp3.DecodeWithSampleRate(globalAudioContext.SampleRate(), bytes.NewReader(s.musicTracks[idx]))
@@ -328,7 +331,7 @@ func (s *battlefieldScene) Update() (entity.Scene, error) {
 		if win {
 			_type = typeGameOverWin
 		}
-		return NewGameOverScene(s.ctx, _type, s.game, s.stampatelloFaceto10, s.questions, s.firstNames, s.stats), nil
+		return NewGameOverScene(s.ctx, _type, s.game, s.stampatelloFaceto10, s.questions, s.firstNames, s.stats, s.options), nil
 	}
 	if s.options.MusicVolume > 0 && (s.musicPlayer == nil || !s.musicPlayer.IsPlaying()) {
 		s.currentTrack = (s.currentTrack + 1) % len(s.musicTracks)
@@ -543,7 +546,7 @@ idleFor:
 				log.Printf("failed to close music player: %v", err)
 			}
 			s.musicPlayer = nil
-			return NewMainMenuScene(s.ctx, s.game, s.questions, s.firstNames), nil
+			return NewMainMenuScene(s.ctx, s.game, s.questions, s.firstNames, s.options), nil
 		case escMenuInRect(mx, my, btnX, btn2Y):
 			s.escMenuOpen = false
 		}

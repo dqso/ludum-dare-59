@@ -44,6 +44,7 @@ type mainMenuScene struct {
 	techInterviewBtn      *widget.Button
 	decreaseDifficultyBtn *widget.Button
 	musicVolumeBtn        *widget.Button
+	soundVolumeBtn        *widget.Button
 	showFPSBtn            *widget.Button
 
 	previewPlayer   *audio.Player
@@ -54,17 +55,13 @@ type mainMenuScene struct {
 	quit bool
 }
 
-func NewMainMenuScene(ctx context.Context, game entity.Game, questions entity.QuestionsForInterview, firstNames entity.FirstNamesDatabase) entity.Scene {
+func NewMainMenuScene(ctx context.Context, game entity.Game, questions entity.QuestionsForInterview, firstNames entity.FirstNamesDatabase, options entity.GameOptions) entity.Scene {
 	s := &mainMenuScene{
 		ctx:        ctx,
 		game:       game,
 		questions:  questions,
 		firstNames: firstNames,
-		options: entity.GameOptions{
-			TechInterview:      true,
-			DecreaseDifficulty: true,
-			MusicVolume:        0.2,
-		},
+		options:    options,
 	}
 
 	fontSrc, err := text.NewGoTextFaceSource(bytes.NewReader(assets.StampatelloFacetoKernTTF))
@@ -196,6 +193,20 @@ func NewMainMenuScene(ctx context.Context, game entity.Game, questions entity.Qu
 	})
 	optC.AddChild(s.musicVolumeBtn)
 
+	s.soundVolumeBtn = newButton(s.soundVolumeLabel(), func() {
+		levels := musicVolumeLevels()
+		for i, v := range levels {
+			if v == s.options.SoundVolume {
+				s.options.SoundVolume = levels[(i+1)%len(levels)]
+				s.playSoundPreview()
+				return
+			}
+		}
+		s.options.SoundVolume = levels[1]
+		s.playSoundPreview()
+	})
+	optC.AddChild(s.soundVolumeBtn)
+
 	s.showFPSBtn = newButton(s.showFPSLabel(), func() {
 		s.options.ShowFPS = !s.options.ShowFPS
 	})
@@ -281,6 +292,15 @@ func (s *mainMenuScene) decreaseDifficultyLabel() string {
 	return fmt.Sprintf("Decrease Difficulty [%s]", state)
 }
 
+func (s *mainMenuScene) soundVolumeLabel() string {
+	labels := map[float64]string{0: "Off", 0.1: "Very Low", 0.2: "Low", 0.5: "Medium", 0.7: "High", 1.0: "Max"}
+	name, ok := labels[s.options.SoundVolume]
+	if !ok {
+		name = "Custom"
+	}
+	return fmt.Sprintf("Sound Volume [%s]", name)
+}
+
 func (s *mainMenuScene) showFPSLabel() string {
 	state := "off"
 	if s.options.ShowFPS {
@@ -305,11 +325,13 @@ func (s *mainMenuScene) Update() (entity.Scene, error) {
 		return nil, ebiten.Termination
 	}
 	if s.next != nil {
-		s.previewPlayer.Pause()
-		if err := s.previewPlayer.Close(); err != nil {
-			log.Printf("failed to close preview player: %v", err)
+		if s.previewPlayer != nil {
+			s.previewPlayer.Pause()
+			if err := s.previewPlayer.Close(); err != nil {
+				log.Printf("failed to close preview player: %v", err)
+			}
+			s.previewPlayer = nil
 		}
-		s.previewPlayer = nil
 		return s.next, nil
 	}
 
@@ -333,6 +355,7 @@ func (s *mainMenuScene) Update() (entity.Scene, error) {
 		s.techInterviewBtn.Text().Label = s.techInterviewLabel()
 		s.decreaseDifficultyBtn.Text().Label = s.decreaseDifficultyLabel()
 		s.musicVolumeBtn.Text().Label = s.musicVolumeLabel()
+		s.soundVolumeBtn.Text().Label = s.soundVolumeLabel()
 		s.showFPSBtn.Text().Label = s.showFPSLabel()
 		s.optionsUI.Update()
 
@@ -360,6 +383,24 @@ func (s *mainMenuScene) Draw(screen *ebiten.Image) {
 }
 
 func (s *mainMenuScene) Name() string { return "Main Menu" }
+
+func (s *mainMenuScene) playSoundPreview() {
+	if s.options.SoundVolume == 0 {
+		return
+	}
+	decoded, err := mp3.DecodeWithSampleRate(globalAudioContext.SampleRate(), bytes.NewReader(assets.NotificationMP3))
+	if err != nil {
+		log.Printf("sound preview decode error: %v", err)
+		return
+	}
+	p, err := globalAudioContext.NewPlayer(decoded)
+	if err != nil {
+		log.Printf("sound preview player error: %v", err)
+		return
+	}
+	p.SetVolume(s.options.SoundVolume)
+	p.Play()
+}
 
 func (s *mainMenuScene) startMusicPreview() {
 	if s.previewPlayer != nil {

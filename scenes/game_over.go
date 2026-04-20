@@ -29,6 +29,7 @@ type gameOverScene struct {
 	questions       entity.QuestionsForInterview
 	firstNames      entity.FirstNamesDatabase
 	centerContainer *widget.Container
+	options         entity.GameOptions
 	next            entity.Scene
 }
 
@@ -39,7 +40,7 @@ const (
 	typeGameOverLose TypeGameOver = "loss"
 )
 
-func NewGameOverScene(ctx context.Context, _type TypeGameOver, game entity.Game, fontFace10 font.Face, questions entity.QuestionsForInterview, firstNames entity.FirstNamesDatabase, stats entity.Stats) entity.Scene {
+func NewGameOverScene(ctx context.Context, _type TypeGameOver, game entity.Game, fontFace10 font.Face, questions entity.QuestionsForInterview, firstNames entity.FirstNamesDatabase, stats entity.Stats, options entity.GameOptions) entity.Scene {
 	title, bgBytes := "You lose.", assets.GameOverPNG
 	if _type == typeGameOverWin {
 		title, bgBytes = "You win.", assets.WinPNG
@@ -65,6 +66,7 @@ func NewGameOverScene(ctx context.Context, _type TypeGameOver, game entity.Game,
 		bg:         bgFull,
 		bgBlurred:  bgBlurred,
 		fontFace10: fontFace10,
+		options:    options,
 		questions:  questions,
 	}
 
@@ -169,7 +171,7 @@ func NewGameOverScene(ctx context.Context, _type TypeGameOver, game entity.Game,
 			}),
 		),
 		widget.ButtonOpts.ClickedHandler(func(args *widget.ButtonClickedEventArgs) {
-			s.next = NewMainMenuScene(ctx, s.game, s.questions, s.firstNames)
+			s.next = NewMainMenuScene(ctx, s.game, s.questions, s.firstNames, s.options)
 		}),
 	)
 

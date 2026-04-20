@@ -80,7 +80,7 @@ func (s *loadScene) Update() (entity.Scene, error) {
 	case loadEndResources:
 		// Почистить память
 
-		return NewMainMenuScene(s.ctx, s.game, s.questions, s.firstNames), nil
+		return NewMainMenuScene(s.ctx, s.game, s.questions, s.firstNames, entity.DefaultGameOptions()), nil
 	}
 	return nil, nil
 }
