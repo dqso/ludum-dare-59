@@ -133,7 +133,7 @@ func NewMainMenuScene(ctx context.Context, game entity.Game, questions entity.Qu
 
 	// --- Main screen ---
 	mainC := makeCenterContainer()
-	addTitle(mainC, "Token Collector")
+	addTitle(mainC, "Hired or Homeless")
 
 	mainC.AddChild(newButton("New Game", func() {
 		s.next = NewGenerateBattlefieldScene(s.ctx, s.game, s.questions, s.firstNames, s.options)
