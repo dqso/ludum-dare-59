@@ -2,8 +2,6 @@ package scenes
 
 import (
 	"context"
-	"encoding/binary"
-	"encoding/hex"
 	"fmt"
 	"image"
 	"image/color"
@@ -12,6 +10,7 @@ import (
 	"math"
 	"math/rand/v2"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dqso/ludum-dare-59/assets"
@@ -153,7 +152,7 @@ func moneyToString(money decimal.Decimal) string {
 	return fmt.Sprintf("$%s", money.StringFixed(2))
 }
 
-func NewBattlefieldScene(ctx context.Context, game entity.Game, questions entity.QuestionsForInterview, firstNames entity.FirstNamesDatabase) entity.Scene {
+func NewBattlefieldScene(ctx context.Context, game entity.Game, questions entity.QuestionsForInterview, firstNames entity.FirstNamesDatabase, options entity.GameOptions) entity.Scene {
 	winW, winH := game.WindowSize()
 
 	startedMoney := float64(startedMoneyFrom*100+rand.Int64N((startedMoneyTo-startedMoneyFrom)*100)) / 100
@@ -233,12 +232,18 @@ func NewBattlefieldScene(ctx context.Context, game entity.Game, questions entity
 }
 
 func (s *battlefieldScene) Update() (entity.Scene, error) {
-	if s.player.Money().LessThan(decimal.NewFromFloat(gameOverMoney)) || ebiten.IsKeyPressed(ebiten.KeyQ) {
+	lose := s.player.Money().LessThan(decimal.NewFromFloat(gameOverMoney))
+	win := s.player.Money().GreaterThan(decimal.NewFromFloat(winnerMoney))
+	if lose || win {
 		s.stats.DurationInGame = s.gameTimeNow().Sub(gameStartDate())
 		s.stats.RealTimePlayed = time.Since(s.gameStart)
 		s.stats.CurrentBalance = s.player.Money()
 		s.stats.MonthlySalary = s.player.SalaryPerMonth()
-		return NewGameOverScene(s.ctx, s.game, s.fontFace10, s.questions, s.firstNames, s.stats), nil
+		_type := typeGameOverLose
+		if win {
+			_type = typeGameOverWin
+		}
+		return NewGameOverScene(s.ctx, _type, s.game, s.fontFace10, s.questions, s.firstNames, s.stats), nil
 	}
 	for c, deleted := range s.characters.DeleteFunc(func(c entity.Character) bool {
 		return time.Since(c.Deadline()) > 0
@@ -347,7 +352,7 @@ idleFor:
 			var a AnswerWithPoint
 			a, s.queueAnswers = s.queueAnswers[i], s.queueAnswers[:i]
 			spawnAngle := rand.Float64() * 2 * math.Pi
-			spawnR := 400 + rand.Float64()*(1000-400)
+			spawnR := 200 + rand.Float64()*(1000-200)
 			t := token.NewToken(s.fontFace14, a.answer,
 				a.x+spawnR*math.Cos(spawnAngle),
 				a.y+spawnR*math.Sin(spawnAngle),
@@ -386,7 +391,7 @@ idleFor:
 			interviewerSpawnBatchSize,
 		)
 		for range interviewersToSpawn {
-			company := hex.EncodeToString(binary.LittleEndian.AppendUint64(nil, uint64(time.Now().UnixNano())))
+			company := s.firstNames.GetRandomCompanyName()
 			questions, answers := s.questions.Recruiter.GetRandomQuestions(4)
 			x := float64(rand.IntN(maxSpawnDistance*2) - maxSpawnDistance)
 			y := float64(rand.IntN(maxSpawnDistance*2) - maxSpawnDistance)
@@ -403,8 +408,8 @@ idleFor:
 			}
 			s.characters.Add(c)
 			msg := fmt.Sprintf(
-				"Hey, Anonymous!\nI'm %s.\nWe're looking for a developer to join our team.\nInterested in a chat?",
-				firstName,
+				"Hey, everyone! My name is %s.\nI represent %s.\nWe're looking for a developer to join us.",
+				firstName, company,
 			)
 			s.messages = append(s.messages, Message{
 				message:   msg,
@@ -557,8 +562,14 @@ idleFor:
 		cx, cy := winW64/2, winH64/2
 		dx, dy := tx-cx, ty-cy
 		const margin = 10.0
+		const hotbarH = 80
 		scaleX := (winW64/2 - margin) / math.Abs(dx)
-		scaleY := (winH64/2 - margin) / math.Abs(dy)
+		var scaleY float64
+		if dy > 0 {
+			scaleY = (winH64 - hotbarH - margin - cy) / dy
+		} else {
+			scaleY = (cy - margin) / math.Abs(dy)
+		}
 		sc := math.Min(scaleX, scaleY)
 		return offscreenSignal{
 			color:      clr,
@@ -667,7 +678,7 @@ func (s *battlefieldScene) Draw(screen *ebiten.Image) {
 			if q := c.GetQuestion(); q != nil {
 				tipX := c.TopLeftX() + c.Width()/2 - s.camera.X
 				tipY := c.TopLeftY() - s.camera.Y
-				drawSpeechBubble(screen, s.fontFace10, s.fontFace14, c.Name(), q.Question(), tipX, tipY)
+				drawSpeechBubble(screen, s.fontFace10, s.fontFace14, titleOfCharacter(c), q.Question(), tipX, tipY)
 			} else if result := c.InterviewResult(); result != nil {
 				tipX := c.TopLeftX() + c.Width()/2 - s.camera.X
 				tipY := c.TopLeftY() - s.camera.Y
@@ -681,7 +692,7 @@ func (s *battlefieldScene) Draw(screen *ebiten.Image) {
 					msg = "..."
 				}
 				if len(msg) > 0 {
-					drawSpeechBubble(screen, s.fontFace10, s.fontFace14, c.Name(), msg, tipX, tipY)
+					drawSpeechBubble(screen, s.fontFace10, s.fontFace14, titleOfCharacter(c), msg, tipX, tipY)
 				}
 			}
 		}
@@ -700,40 +711,10 @@ func (s *battlefieldScene) Draw(screen *ebiten.Image) {
 		}
 	}
 
-	slotWidth := float64(winW) / float64(len(s.inventory))
-	for idx, ct := range s.inventory {
-		if ct == nil {
-			continue
-		}
+	drawInventory(screen, s.fontFace10, s.inventory[:], winW, winH)
 
-		op := &ebiten.DrawImageOptions{}
-		coeff := slotWidth / ct.Width()
-		var dx float64
-		if coeff < 1 {
-			op.GeoM.Scale(coeff, coeff)
-		} else {
-			dx = slotWidth/2 - ct.Width()/2
-		}
-		op.GeoM.Translate(float64(idx)*slotWidth+dx, 0)
-		ct.Draw(screen, op)
-
-		label := strconv.Itoa(idx + 1)
-		rect := text.BoundString(s.fontFace14, label)
-		sprite := ebiten.NewImage(rect.Dx(), rect.Dy())
-		op.GeoM.Reset()
-		op.ColorM.ScaleWithColor(colornames.Gray)
-		op.GeoM.Translate(float64(-rect.Min.X), float64(-rect.Min.Y))
-		text.DrawWithOptions(sprite, label, s.fontFace14, op)
-
-		op.GeoM.Reset()
-		op.GeoM.Translate(
-			float64(idx)*slotWidth+slotWidth/2-float64(rect.Dx())/2,
-			ct.Height()+5,
-		)
-		screen.DrawImage(sprite, op)
-	}
-
-	drawToasts(screen, s.fontFace10, s.messages, float64(winW), float64(winH))
+	const hotbarH = 80 + 10 // barH + sideMargin
+	drawToasts(screen, s.fontFace10, s.messages, float64(winW), float64(winH)-hotbarH)
 
 	s.debug.Draw(screen)
 }
@@ -783,7 +764,7 @@ func drawSpeechBubble(screen *ebiten.Image, face10, face14 font.Face, name, msg 
 
 	boundsName := text.BoundString(face10, name)
 	boundsMsg := text.BoundString(face14, msg)
-	w := float64(boundsName.Dx()) + float64(boundsMsg.Dx()) + pad*2
+	w := math.Max(float64(boundsName.Dx()), float64(boundsMsg.Dx())) + pad*2
 	h := float64(boundsName.Dy()) + float64(boundsMsg.Dy()) + pad*3
 
 	x := tipX - w/2
@@ -848,7 +829,7 @@ func drawToasts(screen *ebiten.Image, face font.Face, messages []Message, winW, 
 		bounds := text.BoundString(face, msg)
 		w := math.Min(float64(bounds.Dx())+pad*2, maxWidth)
 		h := math.Min(float64(bounds.Dy())+pad*2, maxHeight)
-		x := winW - margin - w
+		x := winW - margin*2 - w
 		y -= h
 
 		var bg vector.Path
@@ -877,6 +858,82 @@ func drawToasts(screen *ebiten.Image, face font.Face, messages []Message, winW, 
 
 		y -= margin
 	}
+}
+
+func drawInventory(screen *ebiten.Image, face font.Face, slots []entity.CollectedToken, winW, winH int) {
+	const (
+		barH     float32 = 80.0
+		padY     float32 = 8.0
+		innerPad float32 = 4.0
+	)
+
+	const sideMargin float32 = 10.0
+
+	n := len(slots)
+	barW := float32(winW) - sideMargin*2
+	slotW := barW / float32(n)
+	barY := float32(winH) - barH
+
+	vector.DrawFilledRect(screen, sideMargin, barY, barW, barH, color.NRGBA{10, 10, 25, 210}, true)
+	vector.StrokeRect(screen, sideMargin, barY, barW, barH, 1, color.NRGBA{60, 70, 110, 180}, true)
+
+	for i, ct := range slots {
+		sx := sideMargin + float32(i)*slotW
+		sy := barY
+
+		filled := ct != nil
+		bgClr := color.NRGBA{20, 20, 45, 0}
+		borderClr := color.NRGBA{55, 60, 100, 160}
+		if filled {
+			bgClr = color.NRGBA{35, 40, 80, 180}
+			borderClr = color.NRGBA{130, 150, 230, 255}
+		}
+		vector.DrawFilledRect(screen, sx+innerPad, sy+innerPad, slotW-innerPad*2, barH-innerPad*2, bgClr, true)
+		vector.StrokeRect(screen, sx+innerPad, sy+innerPad, slotW-innerPad*2, barH-innerPad*2, 1.5, borderClr, true)
+
+		slotInnerW := slotW - innerPad*2
+		slotInnerH := barH - innerPad*2 - padY
+
+		if filled {
+			scale := float32(1.0)
+			scaleX := slotInnerW / float32(ct.Width())
+			scaleY := slotInnerH / float32(ct.Height())
+			if scaleX < scale {
+				scale = scaleX
+			}
+			if scaleY < scale {
+				scale = scaleY
+			}
+			scaledW := float32(ct.Width()) * scale
+			scaledH := float32(ct.Height()) * scale
+			op := &ebiten.DrawImageOptions{}
+			op.GeoM.Scale(float64(scale), float64(scale))
+			op.GeoM.Translate(
+				float64(sx+innerPad)+(float64(slotInnerW)-float64(scaledW))/2,
+				float64(sy+innerPad)+(float64(slotInnerH)-float64(scaledH))/2,
+			)
+			ct.Draw(screen, op)
+		}
+
+		label := strconv.Itoa(i + 1)
+		bounds := text.BoundString(face, label)
+		lop := &ebiten.DrawImageOptions{}
+		lop.GeoM.Translate(float64(sx+innerPad)+3-float64(bounds.Min.X), float64(sy+barH-innerPad)-float64(bounds.Dy())-2-float64(bounds.Min.Y))
+		if filled {
+			lop.ColorM.ScaleWithColor(color.RGBA{200, 210, 255, 255})
+		} else {
+			lop.ColorM.ScaleWithColor(color.RGBA{70, 75, 110, 180})
+		}
+		text.DrawWithOptions(screen, label, face, lop)
+	}
+}
+
+func titleOfCharacter(c interface {
+	Name() string
+	Role() entity.CharacterRole
+	Company() string
+}) string {
+	return fmt.Sprintf("%s | %s at %s", c.Name(), strings.Title(c.Role().String()), c.Company())
 }
 
 func clamp(v, lo, hi float64) float64 {

@@ -14,6 +14,7 @@ type QuestionsForInterview struct {
 type FirstNamesDatabase interface {
 	GetRandomFemaleFirstName() string
 	GetRandomMaleFirstName() string
+	GetRandomCompanyName() string
 }
 
 func (q QuestionsForInterview) Choose(roleGetter interface {

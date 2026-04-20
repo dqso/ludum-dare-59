@@ -46,3 +46,5 @@ const (
 	CharacterRoleFounder   = CharacterRole("founder")
 	//CharacterRoleWolf      = CharacterRole("wolf")
 )
+
+func (r CharacterRole) String() string { return string(r) }

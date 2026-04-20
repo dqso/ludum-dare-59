@@ -11,8 +11,14 @@ var (
 	//go:embed male-first-names.txt
 	MaleFirstNamesTxt []byte
 
+	//go:embed company-names.txt
+	CompanyNamesTxt []byte
+
 	//go:embed GameOver.png
 	GameOverPNG []byte
+
+	//go:embed win.png
+	WinPNG []byte
 
 	//go:embed recruiter.csv
 	QuestionsRecruiterCSV []byte
@@ -31,9 +37,6 @@ var (
 
 	//go:embed owner.png
 	OwnerPNG []byte
-
-	//go:embed overdozesans.ttf
-	OverdoseSansTTF []byte
 
 	//go:embed StampatelloFacetoKern.ttf
 	StampatelloFacetoKernTTF []byte

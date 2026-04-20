@@ -25,6 +25,7 @@ type Character struct {
 	focused         bool
 	questions       []entity.Question
 	playerPoints    int
+	lifetime        time.Duration
 	deadline        time.Time
 	company         string
 	prev            entity.Character
@@ -73,6 +74,7 @@ func NewCharacter(name string, role entity.CharacterRole, x, y float64, question
 		sprite:    sprite,
 		role:      role,
 		questions: questions,
+		lifetime:  lifetime,
 		deadline:  time.Now().Add(lifetime),
 		company:   company,
 	}
@@ -128,6 +130,13 @@ func (c *Character) AnswerTheQuestion(questionsDatabase entity.QuestionsDatabase
 
 	var question entity.Question
 	question, c.questions = c.questions[0], c.questions[1:]
+
+	// пролонгировать
+	dur := max(time.Since(c.Deadline()), -time.Since(c.Deadline()))
+	if dur < c.lifetime/2 {
+		c.deadline = time.Now().Add(dur)
+	}
+
 	points, err := questionsDatabase.Match(question, answer)
 	if err != nil {
 		log.Printf("failed to answer the question %q using the answer %q: %v", question, answer, err)

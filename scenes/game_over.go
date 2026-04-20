@@ -19,27 +19,51 @@ import (
 )
 
 type gameOverScene struct {
-	ctx        context.Context
-	game       entity.Game
-	bg         *ebiten.Image
-	ui         *ebitenui.UI
-	fontFace10 font.Face
-	questions  entity.QuestionsForInterview
-	firstNames entity.FirstNamesDatabase
-	next       entity.Scene
+	ctx             context.Context
+	game            entity.Game
+	bg              *ebiten.Image
+	bgBlurred       *ebiten.Image
+	ui              *ebitenui.UI
+	_type           TypeGameOver
+	fontFace10      font.Face
+	questions       entity.QuestionsForInterview
+	firstNames      entity.FirstNamesDatabase
+	centerContainer *widget.Container
+	next            entity.Scene
 }
 
-func NewGameOverScene(ctx context.Context, game entity.Game, fontFace10 font.Face, questions entity.QuestionsForInterview, firstNames entity.FirstNamesDatabase, stats entity.Stats) entity.Scene {
-	bgImg, _, err := image.Decode(bytes.NewReader(assets.GameOverPNG))
+type TypeGameOver string
+
+const (
+	typeGameOverWin  TypeGameOver = "win"
+	typeGameOverLose TypeGameOver = "loss"
+)
+
+func NewGameOverScene(ctx context.Context, _type TypeGameOver, game entity.Game, fontFace10 font.Face, questions entity.QuestionsForInterview, firstNames entity.FirstNamesDatabase, stats entity.Stats) entity.Scene {
+	title, bgBytes := "You lose.", assets.GameOverPNG
+	if _type == typeGameOverWin {
+		title, bgBytes = "You win.", assets.WinPNG
+	}
+	bgImg, _, err := image.Decode(bytes.NewReader(bgBytes))
 	if err != nil {
 		return NewErrorScene(ctx, game, err)
 	}
 
+	bgFull := ebiten.NewImageFromImage(bgImg)
+	const blurScale = 8
+	bw, bh := bgFull.Bounds().Dx()/blurScale, bgFull.Bounds().Dy()/blurScale
+	bgBlurred := ebiten.NewImage(bw, bh)
+	blurOp := &ebiten.DrawImageOptions{}
+	blurOp.GeoM.Scale(1.0/blurScale, 1.0/blurScale)
+	bgBlurred.DrawImage(bgFull, blurOp)
+
 	s := &gameOverScene{
 		ctx:        ctx,
 		game:       game,
+		_type:      _type,
 		firstNames: firstNames,
-		bg:         ebiten.NewImageFromImage(bgImg),
+		bg:         bgFull,
+		bgBlurred:  bgBlurred,
 		fontFace10: fontFace10,
 		questions:  questions,
 	}
@@ -55,6 +79,8 @@ func NewGameOverScene(ctx context.Context, game entity.Game, fontFace10 font.Fac
 
 	type statRow struct{ label, value string }
 	rows := []statRow{
+		{title, ""},
+		{"", ""},
 		{fmt.Sprintf("%d in-game days in %d minutes of real time.", inGameDays, realMinutes), ""},
 		{"", ""},
 		{"Current balance:", moneyToString(stats.CurrentBalance)},
@@ -63,9 +89,9 @@ func NewGameOverScene(ctx context.Context, game entity.Game, fontFace10 font.Fac
 		{"Spent:", moneyToString(stats.Spent)},
 		{"", ""},
 		{"Questions answered:", fmt.Sprintf("%d", stats.QuestionsAnswered)},
+		{"Offers received:", fmt.Sprintf("%d", stats.OffersReceived)},
 		{"Offers accepted:", fmt.Sprintf("%d", stats.OffersAccepted)},
 		{"Offers rejected:", fmt.Sprintf("%d", stats.OffersRejected)},
-		{"Offers received:", fmt.Sprintf("%d", stats.OffersReceived)},
 	}
 
 	rootContainer := widget.NewContainer(
@@ -152,6 +178,7 @@ func NewGameOverScene(ctx context.Context, game entity.Game, fontFace10 font.Fac
 	))
 	centerContainer.AddChild(btn)
 
+	s.centerContainer = centerContainer
 	rootContainer.AddChild(centerContainer)
 
 	s.ui = &ebitenui.UI{Container: rootContainer}
@@ -175,6 +202,32 @@ func (s *gameOverScene) Draw(screen *ebiten.Image) {
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Scale(scaleX, scaleY)
 	screen.DrawImage(s.bg, op)
+
+	// Frosted glass panel behind the stats container.
+	r := s.centerContainer.GetWidget().Rect
+	if !r.Empty() {
+		panelX, panelY := float64(r.Min.X), float64(r.Min.Y)
+		panelW, panelH := float64(r.Dx()), float64(r.Dy())
+		// Blurred bg: scale bgBlurred (1/8 of original) to match the panel area.
+		bw := float64(s.bgBlurred.Bounds().Dx())
+		bh := float64(s.bgBlurred.Bounds().Dy())
+		srcX := panelX / float64(winW) * bw
+		srcY := panelY / float64(winH) * bh
+		srcW := panelW / float64(winW) * bw
+		srcH := panelH / float64(winH) * bh
+		blurOp := &ebiten.DrawImageOptions{}
+		blurOp.GeoM.Scale(panelW/srcW, panelH/srcH)
+		blurOp.GeoM.Translate(panelX, panelY)
+		screen.DrawImage(s.bgBlurred.SubImage(image.Rect(
+			int(srcX), int(srcY), int(srcX+srcW), int(srcY+srcH),
+		)).(*ebiten.Image), blurOp)
+		// Dark tint over the blurred region.
+		overlay := ebiten.NewImage(int(panelW), int(panelH))
+		overlay.Fill(color.NRGBA{0, 0, 0, 140})
+		overlayOp := &ebiten.DrawImageOptions{}
+		overlayOp.GeoM.Translate(panelX, panelY)
+		screen.DrawImage(overlay, overlayOp)
+	}
 
 	s.ui.Draw(screen)
 }

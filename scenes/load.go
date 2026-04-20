@@ -67,7 +67,7 @@ func (s *loadScene) Update() (entity.Scene, error) {
 				}
 				s.questions.Engineer = questions
 			} else if s.firstNames == nil {
-				firstNames, err := database.NewFirstNameDatabase(assets.FemaleFirstNamesTxt, assets.MaleFirstNamesTxt)
+				firstNames, err := database.NewFirstNameDatabase(assets.FemaleFirstNamesTxt, assets.MaleFirstNamesTxt, assets.CompanyNamesTxt)
 				if err != nil {
 					return NewErrorScene(s.ctx, s.game, err), nil
 				}
@@ -85,6 +85,6 @@ func (s *loadScene) Update() (entity.Scene, error) {
 	return nil, nil
 }
 
-func (s *loadScene) Draw(screen *ebiten.Image) {}
+func (s *loadScene) Draw(_ *ebiten.Image) {}
 
 func (s *loadScene) Name() string { return "Load" }

@@ -17,15 +17,17 @@ type generateBattlefieldScene struct {
 
 	questions  entity.QuestionsForInterview
 	firstNames entity.FirstNamesDatabase
+	options    entity.GameOptions
 }
 
-func NewGenerateBattlefieldScene(ctx context.Context, game entity.Game, questions entity.QuestionsForInterview, firstNames entity.FirstNamesDatabase) entity.Scene {
+func NewGenerateBattlefieldScene(ctx context.Context, game entity.Game, questions entity.QuestionsForInterview, firstNames entity.FirstNamesDatabase, options entity.GameOptions) entity.Scene {
 	s := &generateBattlefieldScene{
 		ctx:        ctx,
 		game:       game,
 		questions:  questions,
 		status:     generateBattlefieldStartResources,
 		firstNames: firstNames,
+		options:    options,
 	}
 
 	return s
@@ -60,11 +62,11 @@ func (s *generateBattlefieldScene) Update() (entity.Scene, error) {
 	case generateBattlefieldEndResources:
 		// Почистить память
 
-		return NewBattlefieldScene(s.ctx, s.game, s.questions, s.firstNames), nil
+		return NewBattlefieldScene(s.ctx, s.game, s.questions, s.firstNames, s.options), nil
 	}
 	return nil, nil
 }
 
-func (s *generateBattlefieldScene) Draw(screen *ebiten.Image) {}
+func (s *generateBattlefieldScene) Draw(_ *ebiten.Image) {}
 
 func (s *generateBattlefieldScene) Name() string { return "Generate Battlefield" }

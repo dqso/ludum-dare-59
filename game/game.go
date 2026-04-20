@@ -2,6 +2,7 @@ package game
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/dqso/ludum-dare-59/entity"
@@ -39,6 +40,9 @@ func (g *game) Update() error {
 	}
 	newScene, err := g.scene.Update()
 	if err != nil {
+		if errors.Is(err, ebiten.Termination) {
+			return err
+		}
 		g.scene = scenes.NewErrorScene(g.ctx, g, err)
 		return nil
 	} else {
